@@ -59,7 +59,7 @@ Section detailing current compromises
 
 Items that need to be addressed
 
-* STAR currently does **not** accept multiple forward/reverse FASTQs
+* STAR currently does **not** accept multiple forward/reverse FASTQs [*unlikely to be needed*]
 * Extra arguments for `run.sh` are ignored, error should be raised
 * Job cancellation is difficult when the pipeline crashes
 * I have observed a rare issue with unexpected Fusion shutdown that interrupts processing
