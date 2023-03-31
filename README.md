@@ -64,6 +64,7 @@ Items that need to be addressed
 * Job cancellation is difficult when the pipeline crashes
 * I have observed a rare issue with unexpected Fusion shutdown that interrupts processing
 * No resource tagging; TBD in CDK stack and have instances self-assign `Name` appropriately
+* Staging data from GDS to S3 suffers significant slow down after ~one hour (bursting related?)
 
 #### Usage
 
