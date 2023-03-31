@@ -48,7 +48,7 @@ RUN \
   mkdir -p /root/oncoanalyser/
 
 RUN \
-  git clone github.com/scwatts/oncoanalyser /root/oncoanalyser/software/oncoanalyser/ -b umccr
+  git clone https://github.com/scwatts/oncoanalyser.git /root/oncoanalyser/software/oncoanalyser/ -b umccr
 
 COPY assets/nextflow_aws.config /root/oncoanalyser/assets/
 COPY assets/run.sh /root/oncoanalyser/assets/
