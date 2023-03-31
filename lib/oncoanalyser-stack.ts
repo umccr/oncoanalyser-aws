@@ -131,7 +131,7 @@ export class OncoanalyserStack extends cdk.Stack {
     // Create job definition for pipeline execution
     new batchAlpha.JobDefinition(this, 'OncoanalyserJobDefinition', {
       container: {
-        image: ecs.ContainerImage.fromRegistry('scwatts/oncoanalyser-awsbatch:0.0.4'),
+        image: ecs.ContainerImage.fromRegistry('scwatts/oncoanalyser-awsbatch:0.0.5'),
         command: ['true'],
         memoryLimitMiB: 1000,
         vcpus: 1,
