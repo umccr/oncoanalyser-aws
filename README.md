@@ -63,6 +63,7 @@ Items that need to be addressed
 * Extra arguments for `run.sh` are ignored, error should be raised
 * Job cancellation is difficult when the pipeline crashes
 * I have observed a rare issue with unexpected Fusion shutdown that interrupts processing
+* No resource tagging; TBD in CDK stack and have instances self-assign `Name` appropriately
 
 #### Usage
 
