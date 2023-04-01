@@ -3,7 +3,7 @@ set -euo pipefail
 
 print_help_text() {
     cat <<EOF
-Usage example: run.sh --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam S3_FILE --normal_wgs_bam S3_FILE --output_dir S3_PREFIX
+Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam S3_FILE --normal_wgs_bam S3_FILE --output_dir S3_PREFIX
 
 Options:
   --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts]
@@ -16,12 +16,12 @@ Options:
   --normal_wgs_bam FILE         Input normal WGS BAM
 
   --tumor_wts_id STR            Tumor WTS identifier
-  --tumor_wts_fastq_fwd FILE    Input tumor WTS FASTQ forward
-  --tumor_wts_fastq_rev FILE    Input tumor WTS FASTQ reverse
+  --tumor_wts_fastq_fwd FILE    Input tumor WTS FASTQ (forward)
+  --tumor_wts_fastq_rev FILE    Input tumor WTS FASTQ (reverse)
 
-  --previous_run_dir FILE       Previous run directory to use inputs (expected to be S3 URI)
+  --previous_run_dir FILE       Previous run directory containing inputs (expected to be S3 URI)
 
-  --resume_nextflow_dir FILE    Resume run using this .nextflow/ directory (S3 URI)
+  --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
 
   --output_dir S3_PREFIX        Output S3 prefix
 EOF
@@ -163,10 +163,10 @@ fi;
 # new Docker container from the host service is launched. This means that all local Nextflow processes inherit the EC2
 # instance IAM profile, which can only be set prior at the Batch compute environment creation; in this case that is the
 # non-permissive Nextflow pipeline role. This means to run Nextflow processes locally that can r/w to S3 (e.g. when
-# using fusion), we must set the EC2 instance IAM role to a profile with these permissions. Here I associate the
-# instance with the Oncoanalyser task role - ideally this could be done via job definition.
+# using Fusion, S3 output directory, etc), we must set the EC2 instance IAM role to a profile with such permissions.
+# Here I associate the instance with the OncoanalyserStack task role. There may be better approaches to achieve this.
 
-# NOTE(SW): this is to be updated manually for now and once in CodePipeline
+# NOTE(SW): this is to be updated manually for now until build process is placed into CodePipeline
 
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 association_id=$(
