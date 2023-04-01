@@ -231,7 +231,6 @@ no_check_bucket = true
 EOF
 
   src_fp=$(jq -r '.bucketName + "/" + .keyPrefix + "'${gds_fp##*/}'"' <<< ${creds});
-  src_fp=$(jq -r '.bucketName + "/" + .keyPrefix + "'${gds_fp##*/}'"' <<< ${creds});
 
   if [[ ${gds_fp} =~ .*bam$ ]]; then
     echo "staging ${gds_fp}.bai to s3://${dst_fp}.bai" 1>&2;
