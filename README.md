@@ -56,7 +56,7 @@ Section detailing current compromises
 * Many Docker images on DockerHub, ideally would be on ECR
   * Must resolve 502 errors in Wave when pulling from grch.io or ECR
 * Only broad control over processes run currently
-* Passing run configuration by CLI args is somewhat clumbsy
+* Passing run configuration by CLI args is somewhat clumsy
   * Alternative: JSON on remote (S3, API call); could be extended to general config
 
 Items that need to be addressed
