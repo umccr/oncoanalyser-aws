@@ -6,7 +6,7 @@ print_help_text() {
 Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam S3_FILE --normal_wgs_bam S3_FILE --output_dir S3_PREFIX
 
 Options:
-  --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts]
+  --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
   --subject_id STR              Subject identifier
 
@@ -143,7 +143,18 @@ elif [[ ${mode} == 'wgts_existing_wts' ]]; then
   tumor_wts_id
   previous_run_dir
   '
-fi;
+elif [[ ${mode} == 'wgts_existing_both' ]]; then
+  required_args+='
+  tumor_wgs_id
+  normal_wgs_id
+  tumor_wts_id
+  previous_run_dir
+  '
+else
+  print_help_text
+  echo "--mode got unexpected value: ${mode}" 1>&2
+  exit 1
+fi
 
 missing_args=()
 for argname in ${required_args}; do
@@ -302,6 +313,15 @@ ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,pur
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
 EOF
+elif [[ ${mode} == 'wgts_existing_both' ]]; then
+  cat <<EOF >> samplesheet.csv
+$(samplesheet_wgs_entries)
+$(samplesheet_wts_entries ${tumor_wgs_id})
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${previous_run_dir}/purple/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${previous_run_dir}/isofox/
+EOF
 fi
 
 # NOTE(SW): using new conditional block to separate functionality
@@ -316,6 +336,8 @@ elif [[ ${mode} == 'wgts_existing_wts' ]]; then
   nextflow_args='--processes_exclude star,isofox,chord,lilac,orange,peach,protect,sigs'
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
   nextflow_args='--mode manual --processes_include star,isofox,cuppa'
+elif [[ ${mode} == 'wgts_existing_both' ]]; then
+  nextflow_args='--mode manual --processes_include cuppa'
 fi
 
 if [[ ! -z ${resume_nextflow_dir:-} ]]; then

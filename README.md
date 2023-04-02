@@ -84,11 +84,14 @@ Other notes
 
 Diagram describing common run modes with correponding commands
 
+Run modes (relative to CUPPA)
+
 * WGTS
 * WGS only
 * WTS only
 * WGTS with existing WGS
 * WGTS with existing WTS
+* WGTS with existing WGS and WTS
 
 > include run resuming and use of this as an alternative to providing existing data
 
