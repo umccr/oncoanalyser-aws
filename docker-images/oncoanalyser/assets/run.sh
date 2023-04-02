@@ -97,6 +97,12 @@ if [[ -z "${mode:-}" ]]; then
   exit 1
 fi
 
+if [[ ${mode} == 'wts' || ${mode} == 'wgts_existing_wts' || ${mode} == 'wgts_existing_both' ]]; then
+  print_help_text
+  echo -e "\nERROR: --mode ${mode} is not currently supported; currently unable to generate WTS-only CUPPA visualisations" 1>&2
+  exit 1
+fi
+
 required_args='
 subject_id
 output_dir
