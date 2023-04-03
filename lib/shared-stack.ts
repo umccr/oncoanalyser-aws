@@ -26,7 +26,7 @@ const batchComputePipeline: IBatchComputeData = {
 
 const batchComputeTask: IBatchComputeData[] = [
 
-  // TODO(SW): I need a disk-only queue here if on-demand is to be used
+  // TODO(SW): if the on-demand queue is used, restrict to instances with SSD for Fusion
 
   {
     name: 'unrestricted',
@@ -210,7 +210,7 @@ export class SharedStack extends cdk.Stack {
     // batch-alpha.ComputeEnvironment, which then results in an invalid compute environment
 
     // NOTE(SW): using 777 mode for Fusion NVMe SSD mount since I'm not certain whether different Docker users will
-    // impact ability to access - e.g. Docker contains can run as either be root or mamberuser in oncoanalyser but Batch
+    // impact ability to access e.g. Docker containers can run as either be root or mamberuser in oncoanalyser but Batch
     // might run with elevate privileges
 
     const userData = ec2.UserData.custom(
@@ -305,5 +305,4 @@ chmod 777 /mnt/local_ephemeral/
 
   return [computeEnvironment, jobQueue];
   }
-
 }

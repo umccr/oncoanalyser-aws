@@ -31,8 +31,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, nam
     ],
   });
 
-  // NOTE(SW): below permissions are mostly those described by the Nextflow documents, some minor changes have been made
-  // so that the access is less permissive
+  // NOTE(SW): the below policies are mostly those described by the Nextflow documents, some minor changes have been
+  // made so that the access is less permissive
 
   new iam.Policy(args.context, `${args.namePrefix}PipelinePolicyBatchJobs`, {
     roles: [roleBatchInstance],
@@ -42,7 +42,9 @@ export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, nam
         'batch:SubmitJob',
         'batch:TerminateJob',
       ],
-      // TODO(SW): generalise for AWS environment
+
+      // TODO(SW): generalise for AWS environment; account id can probably be obtained args.context
+
       resources: [
         ...args.jobQueueArns,
         'arn:aws:batch:ap-southeast-2:843407916570:job-definition/*'

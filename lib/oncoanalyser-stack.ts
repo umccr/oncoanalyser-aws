@@ -49,22 +49,21 @@ export class OncoanalyserStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: IOncoanalyserStackProps) {
     super(scope, id, props);
 
-    // IAM Roles: pipeline execution and task execution
     // Task role
     const roleBatchInstanceTask = common.getRoleBatchInstanceTask({
       context: this,
       namePrefix: 'Oncoanalyser',
     });
 
-    // Pipeline role and and grant the follow in addition to base permissions:
+    // Pipeline role; grant the follow in addition to base permissions:
     //
     //  * iam:PassRole
     //     - role ID: OncoanalyserTaskBatchInstanceRole
-    //     - nextflow requirement for Batch job submission
+    //     - Nextflow requirement for Batch job submission
     //
     //  * ec2:DescribeIamInstanceProfileAssociations
     //     - required for locally launched Docker containers
-    //     - these containers inherit instance role, which is the Nextflow pipeline role
+    //     - these containers inherit instance role, which is the SharedStack pipeline role
     //     - usually need at least S3 write permissions hence require setting the correct role to inherit at runtime
     //
     const jobQueueTaskArnsArray = Array.from(props.jobQueueTaskArns.values());
@@ -87,15 +86,15 @@ export class OncoanalyserStack extends cdk.Stack {
         new iam.PolicyStatement({
           actions: [
               'ec2:DescribeIamInstanceProfileAssociations',
-              // NOTE(SW): this /only/ allows passing the Oncoanalyser task role, which is set above
+              // NOTE(SW): this /only/ allows passing the OncoanalyserStack task role, which is set above
               'ec2:ReplaceIamInstanceProfileAssociation',
           ],
           resources: ['*'],
       })],
     }));
 
-    // TODO(SW): must replace above secret with an statement that provides the equivalent (for dev; prod deploy should
-    // just use token SecretManager):
+    // TODO(SW): must replace above secret with an statement that provides the equivalent (for dev only; prod deploy
+    // should just use token from SecretManager):
     //{
     //  "Version": "2012-10-17",
     //  "Statement": [
@@ -111,7 +110,7 @@ export class OncoanalyserStack extends cdk.Stack {
     const profileBatchInstanceTask = new iam.CfnInstanceProfile(this, 'OncoanalyserTaskBatchInstanceProfile', {
       roles: [roleBatchInstanceTask.roleName],
     });
-    // NOTE(SW): profile to manually apply on EC2 instances; unclear if otherwise required
+    // NOTE(SW): create a profile for manually launched EC2 instances; unclear if otherwise required
     const profileBatchInstancePipeline = new iam.CfnInstanceProfile(this, 'OncoanalyserPipelineBatchInstanceProfile', {
       roles: [roleBatchInstancePipeline.roleName],
     });
@@ -131,12 +130,13 @@ export class OncoanalyserStack extends cdk.Stack {
     // Create job definition for pipeline execution
     new batchAlpha.JobDefinition(this, 'OncoanalyserJobDefinition', {
       container: {
-        image: ecs.ContainerImage.fromRegistry('scwatts/oncoanalyser-awsbatch:0.0.4'),
+        image: ecs.ContainerImage.fromRegistry('scwatts/oncoanalyser-awsbatch:0.0.6'),
         command: ['true'],
         memoryLimitMiB: 1000,
         vcpus: 1,
         jobRole: roleBatchInstancePipeline,
         // NOTE(SW): host Docker socket is mounted in the container to launch Docker containers for local processes
+        // NOTE(SW): when not using Fusion we must also mount the Nextflow workdir with a host path
         mountPoints: [
           {
             sourceVolume: 'docker_socket',
@@ -172,5 +172,4 @@ export class OncoanalyserStack extends cdk.Stack {
       }
     }
   }
-
 }
