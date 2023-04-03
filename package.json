@@ -1,6 +1,6 @@
 {
   "name": "nextflow-stack",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "author": "Stephen Watts",
   "bin": {
     "nextflow-stack": "bin/nextflow-stack.js"
