@@ -367,6 +367,7 @@ nextflow \
     -ansi-log false \
     -profile docker \
     -work-dir s3://umccr-temp-dev/stephen/oncoanalyser-awsbatch/scratch/ \
+    --monochrome_logs \
     --input samplesheet.csv \
     --outdir ${output_dir}/output/ \
     --genome GRCh38_umccr \
