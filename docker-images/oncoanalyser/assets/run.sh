@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
+
+## GLOBALS ##
+
+ICA_BASE_URL="https://aps2.platf1orm.illumina.com"
+MAIN_NF_PATH="software/oncoanalyser/main.nf"
+TEMPLATE_CONFIG_PATH="/root/oncoanalyser/assets/nextflow_aws.template.config"
+NEXTFLOW_CONFIG_PATH="nextflow.config"
+GENOME="GRCh38_umccr"
+
+## END GLOBALS ##
+
+## USAGE / ARGS ##
 
 print_help_text() {
   cat <<EOF
@@ -165,69 +178,173 @@ fi
 missing_args=()
 for argname in ${required_args}; do
   if [[ -z "${!argname:-}" ]]; then
-    missing_args+=(${argname})
+    missing_args+=( "${argname}" )
   fi
 done
 
 if [[ ${#missing_args[@]} -gt 0 ]]; then
   print_help_text
-  missing_arg_str=$(echo -n "--${missing_args[0]}"; for arg in ${missing_args[@]:1}; do echo -n ", --${arg}"; done)
-  plurality=$(if [[ ${#missing_args[@]} -gt 1 ]]; then echo are; else echo is; fi)
+
+  # Get missing arguments
+  missing_arg_str="$( \
+    echo -n "--${missing_args[0]}";
+    for arg in "${missing_args[@]:1}"; do
+      echo -n ", --${arg}";
+    done \
+  )"
+
+  # More than one missing arg?
+  # Lets make sure our grammar is right
+  plurality="$( \
+    if [[ "${#missing_args[@]}" -gt 1 ]]; then
+      echo are;
+      else echo is;
+    fi \
+  )"
   echo -e "\nERROR: ${missing_arg_str} ${plurality} required" 1>&2
   exit 1
 fi
 
-# When Nextflow runs a job using the local executor with Docker enabled, I have configured behaviour such that that a
-# new Docker container from the host service is launched. This means that all local Nextflow processes inherit the EC2
-# instance IAM profile, which can only be set prior at the Batch compute environment creation; in this case that is the
-# non-permissive Nextflow pipeline role. This means to run Nextflow processes locally that can r/w to S3 (e.g. when
-# using Fusion, S3 output directory, etc), we must set the EC2 instance IAM role to a profile with such permissions.
-# Here I associate the instance with the OncoanalyserStack task role. There may be better approaches to achieve this.
+## END USAGE / ARGS ##
 
-# NOTE(SW): this is to be updated manually for now until build process is placed into CodePipeline
+## FUNCTIONS ##
 
-instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-association_id=$(
-  aws ec2 describe-iam-instance-profile-associations | \
-    jq -r '
-      .IamInstanceProfileAssociations[] |
-        select(.InstanceId == "'${instance_id}'") |
-        .AssociationId
+## SSM Parameter functions
+get_ssm_parameter_value(){
+  aws ssm get-parameter \
+    --name "$1" \
+    --output json |
+  jq '.Parameter | .Value'
+}
+
+get_cache_bucket_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/nxf/cache_bucket"
+}
+
+get_cache_path_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/nxf/cache_path"
+}
+
+get_dest_bucket_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/nxf/staging_bucket"
+}
+
+get_dest_prefix_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/nxf/staging_prefix"
+}
+
+get_hmf_refdata_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/reference_data/hmf"
+}
+
+get_virusbreakend_db_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/reference_data/virusbreakend"
+}
+
+get_genomes_path_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/reference_data/genomes"
+}
+
+get_batch_instance_role_name_from_ssm(){
+  get_ssm_parameter_value "/oncoanalyser/iam/batch-instance-role-name"
+}
+
+get_ica_access_token_from_secrets_manager(){
+  aws secretsmanager get-secret-value \
+    --secret-id IcaSecretsPortal \
+    --output json | \
+  jq --raw-output \
     '
-)
-aws ec2 replace-iam-instance-profile-association 1>/dev/null \
-  --association-id ${association_id} \
-  --iam-instance-profile Name='OncoanalyserStack-OncoanalyserTaskBatchInstanceProfile-Eq6HgOiK5G71'
+      .SecretString
+    '
+}
 
-if [[ ! -z ${resume_nextflow_dir:-} ]]; then
-  aws s3 sync \
-    --no-progress \
-    ${resume_nextflow_dir}/ ./.nextflow/
-fi
+get_batch_instance_role_arn(){
+  aws iam get-role \
+    --role-name "$(get_batch_instance_role_name_from_ssm)" \
+    --output json | \
+  jq --raw-output \
+   '
+     .Role.Arn
+   '
+}
+
+get_batch_instance_profile_name(){
+  aws iam list-instance-profiles-for-role \
+    --role-name "$(get_ssm_parameter_value "/oncoanalyser/iam/batch-instance-profile-name")" \
+    --output json | \
+  jq --raw-output \
+    '
+      .InstanceProfiles |
+      map(.InstanceProfileName) |
+      .[]
+    '
+}
 
 stage_gds_fp() {
-  gds_fp=${1}
-  gds_dp=${gds_fp%/*}/
+  local gds_fp="${1}"
+  local gds_dp="${gds_fp%/*}/"
 
-  dst_bucket=umccr-temp-dev
-  dst_key_base=stephen/gds_staging_dev
+  # Local vars
+  local dst_bucket
+  local dst_key_base
+  local dst_dp
+  local dst_fp
+  local gds_volume_name
+  local gds_path
+  local gds_folder_id
+  local creds
+  local src_fp
 
-  dst_dp=${dst_bucket}/${dst_key_base}
-  dst_fp=${dst_dp}/${gds_fp##*/}
+
+  dst_bucket="$(get_dest_bucket_from_ssm)"
+  dst_key_base="$(get_dest_prefix_from_ssm)"
+
+  dst_dp="${dst_bucket}/${dst_key_base}"
+  dst_fp="${dst_dp}/${gds_fp##*/}"
 
   echo s3://${dst_fp}
 
   if [[ -z "${ICA_ACCESS_TOKEN:-}" ]]; then
-    AWS_DEFAULT_REGION=ap-southeast-2 aws lambda invoke \
-      --function-name arn:aws:lambda:ap-southeast-2:472057503814:function:IcaSecretsPortalProvider \
-      response.json 1>/dev/null
-
-    export ICA_ACCESS_TOKEN=$(jq -r < response.json)
+    ICA_ACCESS_TOKEN="$(get_ica_access_token_from_secrets_manager)"
+    export ICA_ACCESS_TOKEN
     shred -u response.json
   fi
 
-  resp=$(ica folders update --with-access ${gds_dp} -o json)
-  creds=$(jq -r '.objectStoreAccess.awsS3TemporaryUploadCredentials' <<< ${resp})
+  # Get gds folder id from data path
+  gds_volume_name="$( \
+    python3 -c "from urllib.parse import urlparse; print(urlparse('${gds_dp}').netloc)" \
+  )"
+  gds_path="$( \
+    python3 -c "from urllib.parse import urlparse; print(urlparse('${gds_dp}').path)" \
+  )"
+  gds_folder_id="$( \
+    curl --fail --silent --location --show-error \
+      --request "GET" \
+      --header "Accept: application/json" \
+      --header "Authorization: Bearer ${ICA_ACCESS_TOKEN}" \
+      --url "${ICA_BASE_URL}/v1/folders?volume.name=${gds_volume_name}&path=${gds_path}" | \
+    jq --raw-output \
+      '
+        .items |
+        map(.id) |
+        .[]
+      ' \
+  )"
+
+  # Get ICA credentials for folder
+  creds="$( \
+    curl --fail --silent --location --show-error \
+      --request "PATCH" \
+      --header 'Accept: application/json' \
+      --header "Authorization: Bearer ${ICA_ACCESS_TOKEN}" \
+      --header "Content-Type: application/json-patch+json" \
+      --url "${ICA_BASE_URL}/v1/folders/${gds_folder_id}?include=ObjectStoreAccess" \
+      --data '{}' | \
+    jq --raw-output \
+      '.objectStoreAccess.awsS3TemporaryUploadCredentials' \
+  )"
+
 
   mkdir -p ~/.config/rclone/
 
@@ -235,9 +352,9 @@ stage_gds_fp() {
 [ica]
 type = s3
 provider = AWS
-access_key_id = $(jq -r '.access_Key_Id' <<< ${creds})
-secret_access_key = $(jq -r '.secret_Access_Key' <<< ${creds})
-session_token = $(jq -r '.session_Token' <<< ${creds})
+access_key_id = $(jq --raw-output '.access_Key_Id' <<< "${creds}")
+secret_access_key = $(jq --raw-output '.secret_Access_Key' <<< "${creds}")
+session_token = $(jq --raw-output '.session_Token' <<< "${creds}")
 region = ap-southeast-2
 
 [aws]
@@ -248,16 +365,94 @@ region = ap-southeast-2
 no_check_bucket = true
 EOF
 
-  src_fp=$(jq -r '.bucketName + "/" + .keyPrefix + "'${gds_fp##*/}'"' <<< ${creds})
+  src_fp="$( \
+    jq --raw-output \
+      --arg gds_fp "${gds_fp##*/}" \
+      '\(.bucketName)/\(.keyPrefix)\($gds_fp)' \
+      <<< "${creds}" \
+  )"
 
-  if [[ ${gds_fp} =~ .*bam$ ]]; then
+  if [[ "${gds_fp}" =~ .*bam$ ]]; then
     echo "staging ${gds_fp}.bai to s3://${dst_fp}.bai" 1>&2
-    rclone copy --s3-upload-concurrency 8 ica:${src_fp}.bai aws:${dst_dp}/
+    rclone copy --s3-upload-concurrency 8 \
+      "ica:${src_fp}.bai" "aws:${dst_dp}/"
   fi
 
   echo "staging ${gds_fp} to s3://${dst_fp}" 1>&2
-  rclone copy --s3-upload-concurrency 8 ica:${src_fp} aws:${dst_dp}/
+  rclone copy --s3-upload-concurrency 8 \
+    "ica:${src_fp}" "aws:${dst_dp}/"
 }
+
+samplesheet_wgs_entries() {
+  echo "${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bam,${input_fps['tumor_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bam,${input_fps['normal_wgs_bam']}"
+}
+
+samplesheet_wts_entries() {
+  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_fwd,${input_fps['tumor_wts_fastq_fwd']}"
+  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_rev,${input_fps['tumor_wts_fastq_rev']}"
+}
+
+# Final upload data function
+upload_data() {
+  aws s3 sync \
+    --no-progress \
+    --no-follow-symlinks \
+    --exclude='software/*' \
+    --exclude='assets/*' \
+    --exclude='work/*' \
+    ./ "${output_dir}/"
+}
+
+## END FUNCTIONS ##
+
+## GET AWS REGION ##
+
+# Get the current aws region
+# https://stackoverflow.com/questions/4249488/find-region-from-within-an-ec2-instance
+AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+
+export AWS_REGION
+
+
+## LOCAL EXECUTOR WORKAROUND ##
+
+# When Nextflow runs a job using the local executor with Docker enabled, I have configured behaviour such that that a
+# new Docker container from the host service is launched. This means that all local Nextflow processes inherit the EC2
+# instance IAM profile, which can only be set prior at the Batch compute environment creation; in this case that is the
+# non-permissive Nextflow pipeline role. This means to run Nextflow processes locally that can r/w to S3 (e.g. when
+# using Fusion, S3 output directory, etc), we must set the EC2 instance IAM role to a profile with such permissions.
+# Here I associate the instance with the OncoanalyserStack task role. There may be better approaches to achieve this.
+
+instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+association_id=$(
+  aws ec2 describe-iam-instance-profile-associations | \
+    jq --raw-output \
+      --arg instance_id "${instance_id}" \
+      '
+        .IamInstanceProfileAssociations |
+        map(
+          select(.InstanceId == $instance_id)
+        ) |
+        map(
+          .AssociationId
+        ) |
+        .[]
+      '
+)
+aws ec2 replace-iam-instance-profile-association 1>/dev/null \
+  --association-id "${association_id}" \
+  --iam-instance-profile "Name=$(get_batch_instance_profile_name)"
+
+if [[ -n "${resume_nextflow_dir:-}" ]]; then
+  aws s3 sync \
+    --no-progress \
+    "${resume_nextflow_dir}/" ./.nextflow/
+fi
+
+## END LOCAL EXECUTOR WORKAROUND ##
+
+## SAMPLESHEET PREP ##
 
 input_file_args='
 tumor_wgs_bam
@@ -274,21 +469,12 @@ for fp_name in ${input_file_args}; do
   fi
 
   if [[ ${fp} =~ ^gds://.* ]]; then
-    input_fps[${fp_name}]=$(stage_gds_fp ${fp})
+    input_fps[${fp_name}]=$(stage_gds_fp "${fp}")
   else
     input_fps[${fp_name}]=${fp}
   fi
 done
 
-samplesheet_wgs_entries() {
-  echo ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bam,${input_fps['tumor_wgs_bam']}
-  echo ${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bam,${input_fps['normal_wgs_bam']}
-}
-
-samplesheet_wts_entries() {
-  echo ${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_fwd,${input_fps['tumor_wts_fastq_fwd']}
-  echo ${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_rev,${input_fps['tumor_wts_fastq_rev']}
-}
 
 cat <<EOF > samplesheet.csv
 id,subject_name,sample_name,sample_type,sequence_type,filetype,filepath
@@ -300,12 +486,12 @@ $(samplesheet_wgs_entries)
 EOF
 elif [[ ${mode} == 'wts' ]]; then
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wts_entries ${tumor_wts_id})
+$(samplesheet_wts_entries "${tumor_wts_id}")
 EOF
 elif [[ ${mode} == 'wgts' ]]; then
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries ${tumor_wgs_id})
+$(samplesheet_wts_entries "${tumor_wgs_id}")
 EOF
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
   cat <<EOF >> samplesheet.csv
@@ -314,7 +500,7 @@ ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir
 EOF
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wts_entries ${tumor_wgs_id})
+$(samplesheet_wts_entries "${tumor_wgs_id}")
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${previous_run_dir}/purple/
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
@@ -322,13 +508,17 @@ EOF
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries ${tumor_wgs_id})
+$(samplesheet_wts_entries "${tumor_wgs_id}")
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${previous_run_dir}/purple/
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
 ${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${previous_run_dir}/isofox/
 EOF
 fi
+
+## END SAMPLESHEET PREP ##
+
+## NEXTFLOW ARGS ##
 
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
@@ -346,31 +536,41 @@ elif [[ ${mode} == 'wgts_existing_both' ]]; then
   nextflow_args='--mode manual --processes_include cuppa'
 fi
 
-if [[ ! -z ${resume_nextflow_dir:-} ]]; then
+if [[ -n "${resume_nextflow_dir:-}" ]]; then
   nextflow_args+=' -resume'
 fi
 
-upload_data() {
-  aws s3 sync \
-    --no-progress \
-    --no-follow-symlinks \
-    --exclude='software/*' \
-    --exclude='assets/*' \
-    --exclude='work/*' \
-    ./ ${output_dir}/
-}
+## END NEXFLOW ARGS ##
+
+## CREATE NEXTFLOW CONFIG ##
+sed \
+  --regexp-extended \
+  --expression \
+    "
+      s#__S3_GENOMES_DATA_PATH__#$(get_genomes_path_from_ssm)#g;
+      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn)#g
+    " \
+  "${TEMPLATE_CONFIG_PATH}" > "${NEXTFLOW_CONFIG_PATH}"
+
+## END CREATE NEXTFLOW CONFIG ##
 trap upload_data EXIT
 
 nextflow \
-  -config assets/nextflow_aws.config \
-  run software/oncoanalyser/main.nf \
-    -ansi-log false \
-    -profile docker \
-    -work-dir s3://umccr-temp-dev/stephen/oncoanalyser-awsbatch/scratch/ \
+  -config "${NEXTFLOW_CONFIG_PATH}" \
+  run "${MAIN_NF_PATH}" \
+    -ansi-log "false" \
+    -profile "docker" \
+    -work-dir "s3://$(get_cache_bucket_from_ssm)$(get_cache_path_from_ssm)" \
     --monochrome_logs \
-    --input samplesheet.csv \
-    --outdir ${output_dir}/output/ \
-    --genome GRCh38_umccr \
+    --input "samplesheet.csv" \
+    --outdir "${output_dir}/output/" \
+    --genome "${GENOME}" \
     ${nextflow_args} \
-    --ref_data_virusbreakenddb_path s3://umccr-research-dev/stephen/oncoanalyser_data/virusbreakend/virusbreakenddb_20210401/ \
-    --ref_data_hmf_data_path s3://umccr-research-dev/stephen/oncoanalyser_data/hmf_reference_data/repacks/5.32+dev1_38_0.0.1/
+    --ref_data_hmf_data_path "$(get_hmf_refdata_from_ssm)" \
+    --ref_data_virusbreakenddb_path "$(get_virusbreakend_db_from_ssm)"
+
+# Upload data cleanly
+upload_data
+
+# Then exit cleanly
+trap - EXIT
