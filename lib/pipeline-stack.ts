@@ -1,4 +1,4 @@
-import {Environment, pipelines, Stack, StackProps} from "aws-cdk-lib";
+import {CfnOutput, Environment, pipelines, Stack, StackProps} from "aws-cdk-lib";
 
 import {Construct} from "constructs";
 
@@ -117,7 +117,8 @@ export class NextflowBuildPipelineStack extends Stack {
             env: AWS_ENV_BUILD,
             stack_name: "oncoanalyser",
             // See https://github.com/aws/aws-cdk/issues/20643#issuecomment-1219565988 for more info as to how this works
-            tag: tag_date + "--" + "#{Source@umccr_nextflow-stack.CommitId}"
+            tag_date: tag_date,
+            commit_id: "#{Source@umccr_nextflow-stack.CommitId}"
         })
 
         // Add Docker stage to pipeline

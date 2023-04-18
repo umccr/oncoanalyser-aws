@@ -24,7 +24,8 @@ const app = new App()
 const dev_dockerbuild_stack = new DockerBuildStack(app, "DockerDevStack", {
   env: AWS_ENV_DEV,
   stackName: "DockerBuild",
-  tag: "dev"
+  tag_date: "19700101",
+  commit_id: "abcdefg"
 });
 
 const dev_application_stack = new NextflowApplicationStack(app, 'NextflowApplicationDevStack', {
