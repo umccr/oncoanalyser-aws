@@ -8,6 +8,7 @@ import {StringParameter} from "aws-cdk-lib/aws-ssm";
 
 interface NextflowApplicationBuildStackProps extends StackProps {
     env: Environment,
+    docker_tag?: string,
     stack_name: string,
     cache_bucket: string,
     cache_prefix: string,
@@ -26,6 +27,19 @@ export class NextflowApplicationStack extends Stack {
         props: NextflowApplicationBuildStackProps,
     ) {
         super(scope, id, props);
+
+        // Add in docker tag that we've collected from the inputs
+        if (props.docker_tag !== undefined){
+            new StringParameter(
+                this,
+                `ssm-parameter-docker-tag`,
+                {
+                    parameterName: "/oncoanalyser/docker/tag",
+                    stringValue: props.docker_tag
+                }
+            )
+        }
+
 
         const shared = new SharedStack(this, 'NextflowSharedStack', {
             env: props.env,
@@ -72,6 +86,7 @@ export class NextflowApplicationStack extends Stack {
 
 interface NextflowApplicationBuildStageProps extends StackProps {
     env: Environment,
+    docker_tag: string,
     stack_name: string,
     cache_bucket: string,
     cache_prefix: string,

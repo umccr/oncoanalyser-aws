@@ -20,17 +20,16 @@ import {DockerBuildStack} from "../lib/docker-build-stack";
 const app = new App()
 
 
-
 const dev_dockerbuild_stack = new DockerBuildStack(app, "DockerDevStack", {
   env: AWS_ENV_DEV,
   stackName: "DockerBuild",
-  tag_date: "19700101",
-  commit_id: "abcdefg"
+  tag: "dev"
 });
 
 const dev_application_stack = new NextflowApplicationStack(app, 'NextflowApplicationDevStack', {
   env: AWS_ENV_DEV,
   stack_name: "NextflowStack",
+  docker_tag: dev_dockerbuild_stack.dockerTag.toString(),
   ssm_parameters: SSM_PARAMETERS["DEV"],
   cache_bucket: NXF_CACHE_BUCKET_DEV,
   cache_prefix: NXF_CACHE_PREFIX_DEV,

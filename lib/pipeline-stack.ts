@@ -1,4 +1,4 @@
-import {CfnOutput, Environment, pipelines, Stack, StackProps} from "aws-cdk-lib";
+import {Environment, pipelines, Stack, StackProps} from "aws-cdk-lib";
 
 import {Construct} from "constructs";
 
@@ -113,13 +113,19 @@ export class NextflowBuildPipelineStack extends Stack {
 
         // Build docker image (shared stack between staging and dev)
         const tag_date = (moment(new Date())).format('YYYYMMDDHHmmSS')
+
+        // Collect the commit id (use 'latest' if running synth locally)
+        const commit_id = (process.env.CODEBUILD_RESOLVED_SOURCE_VERSION || "latest").substring(0, 8)
+
         const dockerStage = new DockerBuildStage(this, "BuildDockerImage", {
             env: AWS_ENV_BUILD,
             stack_name: "oncoanalyser",
             // See https://github.com/aws/aws-cdk/issues/20643#issuecomment-1219565988 for more info as to how this works
-            tag_date: tag_date,
-            commit_id: "#{Source@umccr_nextflow-stack.CommitId}"
+            // Also inspired by https://stackoverflow.com/questions/74979993/how-do-i-obtain-exposed-variables-from-codebuild-in-the-cdk
+            tag: tag_date + "--" + commit_id
         })
+
+        const docker_tag = dockerStage.dockerTag.toString()
 
         // Add Docker stage to pipeline
         pipeline.addStage(
@@ -131,6 +137,7 @@ export class NextflowBuildPipelineStack extends Stack {
             // Testing coming
             const stgStage = new NextflowApplicationBuildStage(this, "BuildStg", {
                 env: AWS_ENV_STG,
+                docker_tag: docker_tag,
                 stack_name: "oncoanalyser",
                 cache_bucket: NXF_CACHE_BUCKET_STG,
                 cache_prefix: NXF_CACHE_PREFIX_STG,
@@ -148,6 +155,7 @@ export class NextflowBuildPipelineStack extends Stack {
         {
             const prodStage = new NextflowApplicationBuildStage(this, "BuildProd", {
                 env: AWS_ENV_PROD,
+                docker_tag: docker_tag,
                 stack_name: "oncoanalyser",
                 cache_bucket: NXF_CACHE_BUCKET_PROD,
                 cache_prefix: NXF_CACHE_PREFIX_PROD,
