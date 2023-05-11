@@ -1,13 +1,19 @@
-import * as cdk from 'aws-cdk-lib';
 import {Stack} from 'aws-cdk-lib'
-import {CompositePrincipal, ManagedPolicy, Policy, PolicyStatement, Role, ServicePrincipal} from 'aws-cdk-lib/aws-iam'
+import {
+  CompositePrincipal,
+  ManagedPolicy,
+  Policy,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam'
 
 
 export function getRoleBatchInstanceTask(args: { context: Stack, namePrefix: string }) {
   return new Role(args.context, `${args.namePrefix}TaskBatchInstanceRole`, {
     assumedBy: new CompositePrincipal(
-        new ServicePrincipal('ec2.amazonaws.com'),
-        new ServicePrincipal('ecs-tasks.amazonaws.com'),
+      new ServicePrincipal('ec2.amazonaws.com'),
+      new ServicePrincipal('ecs-tasks.amazonaws.com'),
     ),
     managedPolicies: [
       ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
@@ -22,8 +28,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
 
   const roleBatchInstance = new Role(args.context, `${args.namePrefix}PipelineBatchInstanceRole`, {
     assumedBy: new CompositePrincipal(
-        new ServicePrincipal('ec2.amazonaws.com'),
-        new ServicePrincipal('ecs-tasks.amazonaws.com'),
+      new ServicePrincipal('ec2.amazonaws.com'),
+      new ServicePrincipal('ecs-tasks.amazonaws.com'),
     ),
     managedPolicies: [
       ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),

@@ -18,27 +18,11 @@ ARG DOCKER_CE_CLI_VERSION="23.0.1-1"
 ARG DOCKER_BUILDX_VERSION="0.10.2-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
-# ONCOANALYSER SOFTWARE PATH
-ARG ONCOANALYSER_GITHUB_REPO_URL="https://github.com/scwatts/oncoanalyser.git"
-# SOFTWARE VERSIONS
-ARG ONCOANALYSER_GITHUB_BRANCH_NAME="umccr"
+# Pipeline GH URL and branch/tag
+ARG PIPELINE_GITHUB_REPO_URL="https://github.com/scwatts/star-align-nf.git"
+ARG PIPELINE_GITHUB_REF="main"
 
-# Run apt updates
-# Install unversioned software
-RUN \
-   apt update -y -q && \
-   apt install -y -q \
-     unzip \
-     wget
-
-# Run apt updates
-RUN \
-  apt update -y -q && \
-  apt install -y \
-    jq="${JQ_VERSION}*" \
-    openjdk-17-jre="${OPEN_JDK_VERSION}*" && \
-  apt clean -y -q
-
+# Configure Conda
 RUN \
   conda install --yes \
     conda-libmamba-solver && \
@@ -49,6 +33,17 @@ channels:\n\
   - bioconda\n\
   - defaults\n\
 ' > ~/.condarc
+
+# Install software with apt
+RUN \
+  apt update -y -q && \
+  apt install -y -q \
+    curl \
+    jq="${JQ_VERSION}*" \
+    openjdk-17-jre="${OPEN_JDK_VERSION}*" \
+    unzip \
+    wget && \
+  apt clean -y -q
 
 # Install nextflow
 RUN \
@@ -66,9 +61,9 @@ ENV PATH "${NEXTFLOW_PATH}:$PATH"
 RUN \
   wget --quiet 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' \
     --output-document "awscli.zip" && \
-    unzip -qq "awscli.zip" && \
-    ./aws/install && \
-    rm -rf aws/ "awscli.zip"
+  unzip -qq "awscli.zip" && \
+  ./aws/install && \
+  rm -rf aws/ "awscli.zip"
 
 # Install rclone and parallel via conda
 # Need a later version of parallel to prevent escape of tilda characters in chunk below
@@ -98,19 +93,19 @@ RUN \
   rm -rf "docker_install_temp/" && \
   apt clean -y -q
 
-
+# Install pipeline software and config
 RUN \
-  mkdir -p "/root/oncoanalyser/software/" && \
-  mkdir -p "/root/oncoanalyser/assets/" && \
+  mkdir -p "/root/pipeline/software/" && \
+  mkdir -p "/root/pipeline/assets/" && \
   ( \
-    cd "/root/oncoanalyser/software/" && \
-    git clone --branch "${ONCOANALYSER_GITHUB_BRANCH_NAME}" "${ONCOANALYSER_GITHUB_REPO_URL}" \
+    cd "/root/pipeline/software/" && \
+    git clone --branch "${PIPELINE_GITHUB_REF}" "${PIPELINE_GITHUB_REPO_URL}" \
   )
 
-COPY assets/nextflow_aws.template.config /root/oncoanalyser/assets/
-COPY assets/run.sh /root/oncoanalyser/assets/
+COPY assets/nextflow_aws.template.config /root/pipeline/assets/
+COPY assets/run.sh /root/pipeline/assets/
 
 RUN \
-  chmod +x "/root/oncoanalyser/assets/run.sh"
+  chmod +x "/root/pipeline/assets/run.sh"
 
-WORKDIR /root/oncoanalyser/
+WORKDIR /root/pipeline/

@@ -29,6 +29,16 @@ Future work
 
 🚧
 
+* Detail application stacks that must be deployed aplus additional set up (i.e. ECR, Docker images)
+
+### Development
+
+> `deployment/development-stack.ts`
+
+### CodePipeline CI/CD
+
+> `deployment/codepipeline-stack.ts`
+
 ## Pipelines
 
 🚧
@@ -37,9 +47,15 @@ Future work
 
 🚧
 
-UMCCR-specific branch ([link](https://github.com/scwatts/oncoanalyser/tree/umccr))
+### star-align-nf
 
-> set to be separated into a different repo under a different name
+🚧
+
+> `umccr/star-align-nf`
+
+### UMCCR post-processing
+
+🚧
 
 #### Design
 
@@ -51,7 +67,6 @@ Section detailing current compromises
 
 * GDS token access
 * Migrating data from GDS to S3 for execution
-* Manual Docker image build process
 * Not fully optimised for speed; show timeline or similar
 * Many Docker images on DockerHub, ideally would be on ECR
   * Must resolve 502 errors in Wave when pulling from grch.io or ECR
@@ -63,11 +78,12 @@ Items that need to be addressed
 
 * **Important**: Isofox takes an expected count file that is dependent of read length
   * So we **must** be sure that we're using expected counts for the correct read length
-* STAR currently does **not** accept multiple forward/reverse FASTQs [*unlikely to be needed*]
+* Application still tied to UMCCR VPC and other resources
+* Repetition between pipeline stacks and associated code (run.sh, Dockerfile, etc)
+* Cannot parallelise workflow stack deployment in CodePipeline with waves in current set up
 * Extra arguments for `run.sh` are ignored, error should be raised
 * Job cancellation is difficult when the pipeline crashes
 * I have observed a rare issue with unexpected Fusion shutdown that interrupts processing
-* No resource tagging; TBD in CDK stack and have instances self-assign `Name` appropriately
 * Staging data from GDS to S3 suffers significant slow down after ~one hour (bursting related?)
   * Could spin out multiple instances or high capacity instance improve transfer speed
 

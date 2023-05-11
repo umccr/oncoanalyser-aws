@@ -4,11 +4,10 @@ set -euo pipefail
 
 ## GLOBALS ##
 
-ICA_BASE_URL="https://aps2.platf1orm.illumina.com"
+ICA_BASE_URL="https://aps2.platform.illumina.com"
 MAIN_NF_PATH="software/oncoanalyser/main.nf"
-TEMPLATE_CONFIG_PATH="/root/oncoanalyser/assets/nextflow_aws.template.config"
+TEMPLATE_CONFIG_PATH="/root/pipeline/assets/nextflow_aws.template.config"
 NEXTFLOW_CONFIG_PATH="nextflow.config"
-GENOME="GRCh38_umccr"
 
 ## END GLOBALS ##
 
@@ -16,7 +15,7 @@ GENOME="GRCh38_umccr"
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam S3_FILE --normal_wgs_bam S3_FILE --output_dir S3_PREFIX
+Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam FILE --normal_wgs_bam FILE --output_dir S3_PREFIX
 
 Options:
   --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
@@ -29,8 +28,7 @@ Options:
   --normal_wgs_bam FILE         Input normal WGS BAM
 
   --tumor_wts_id STR            Tumor WTS identifier
-  --tumor_wts_fastq_fwd FILE    Input tumor WTS FASTQ (forward)
-  --tumor_wts_fastq_rev FILE    Input tumor WTS FASTQ (reverse)
+  --tumor_wts_bam FILE          Input tumor WTS BAM
 
   --previous_run_dir FILE       Previous run directory containing inputs (expected to be S3 URI)
 
@@ -73,12 +71,8 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
-    --tumor_wts_fastq_fwd)
-      tumor_wts_fastq_fwd="$2"
-      shift 1
-    ;;
-    --tumor_wts_fastq_rev)
-      tumor_wts_fastq_rev="$2"
+    --tumor_wts_bam)
+      tumor_wts_bam="$2"
       shift 1
     ;;
 
@@ -131,8 +125,7 @@ if [[ ${mode} == 'wgs' ]]; then
 elif [[ ${mode} == 'wts' ]]; then
   required_args+='
   tumor_wts_id
-  tumor_wts_fastq_fwd
-  tumor_wts_fastq_rev
+  tumor_wts_bam
   '
 elif [[ ${mode} == 'wgts' ]]; then
   required_args+='
@@ -141,16 +134,14 @@ elif [[ ${mode} == 'wgts' ]]; then
   tumor_wgs_bam
   normal_wgs_bam
   tumor_wts_id
-  tumor_wts_fastq_fwd
-  tumor_wts_fastq_rev
+  tumor_wts_bam
   '
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
   required_args+='
   tumor_wgs_id
   normal_wgs_id
   tumor_wts_id
-  tumor_wts_fastq_fwd
-  tumor_wts_fastq_rev
+  tumor_wts_bam
   previous_run_dir
   '
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
@@ -214,39 +205,43 @@ get_ssm_parameter_value(){
   aws ssm get-parameter \
     --name "$1" \
     --output json |
-  jq '.Parameter | .Value'
+  jq --raw-output '.Parameter | .Value'
 }
 
 get_cache_bucket_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/nxf/cache_bucket"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/cache_bucket"
 }
 
-get_cache_path_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/nxf/cache_path"
+get_cache_prefix_from_ssm(){
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/cache_prefix"
 }
 
 get_dest_bucket_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/nxf/staging_bucket"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/staging_bucket"
 }
 
 get_dest_prefix_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/nxf/staging_prefix"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/staging_prefix"
 }
 
 get_hmf_refdata_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/reference_data/hmf"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_hmf"
 }
 
 get_virusbreakend_db_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/reference_data/virusbreakend"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_virusbreakend"
 }
 
 get_genomes_path_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/reference_data/genomes"
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_genomes"
 }
 
-get_batch_instance_role_name_from_ssm(){
-  get_ssm_parameter_value "/oncoanalyser/iam/batch-instance-role-name"
+get_batch_instance_role_arn_from_ssm(){
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_task_instance_role_arn"
+}
+
+get_batch_instance_profile_arn_from_ssm(){
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_task_instance_profile_arn"
 }
 
 get_ica_access_token_from_secrets_manager(){
@@ -256,28 +251,6 @@ get_ica_access_token_from_secrets_manager(){
   jq --raw-output \
     '
       .SecretString
-    '
-}
-
-get_batch_instance_role_arn(){
-  aws iam get-role \
-    --role-name "$(get_batch_instance_role_name_from_ssm)" \
-    --output json | \
-  jq --raw-output \
-   '
-     .Role.Arn
-   '
-}
-
-get_batch_instance_profile_name(){
-  aws iam list-instance-profiles-for-role \
-    --role-name "$(get_ssm_parameter_value "/oncoanalyser/iam/batch-instance-profile-name")" \
-    --output json | \
-  jq --raw-output \
-    '
-      .InstanceProfiles |
-      map(.InstanceProfileName) |
-      .[]
     '
 }
 
@@ -308,7 +281,6 @@ stage_gds_fp() {
   if [[ -z "${ICA_ACCESS_TOKEN:-}" ]]; then
     ICA_ACCESS_TOKEN="$(get_ica_access_token_from_secrets_manager)"
     export ICA_ACCESS_TOKEN
-    shred -u response.json
   fi
 
   # Get gds folder id from data path
@@ -368,15 +340,13 @@ EOF
   src_fp="$( \
     jq --raw-output \
       --arg gds_fp "${gds_fp##*/}" \
-      '\(.bucketName)/\(.keyPrefix)\($gds_fp)' \
+      '"\(.bucketName)/\(.keyPrefix)\($gds_fp)"' \
       <<< "${creds}" \
   )"
 
-  if [[ "${gds_fp}" =~ .*bam$ ]]; then
-    echo "staging ${gds_fp}.bai to s3://${dst_fp}.bai" 1>&2
-    rclone copy --s3-upload-concurrency 8 \
-      "ica:${src_fp}.bai" "aws:${dst_dp}/"
-  fi
+  echo "staging ${gds_fp}.bai to s3://${dst_fp}.bai" 1>&2
+  rclone copy --s3-upload-concurrency 8 \
+    "ica:${src_fp}.bai" "aws:${dst_dp}/"
 
   echo "staging ${gds_fp} to s3://${dst_fp}" 1>&2
   rclone copy --s3-upload-concurrency 8 \
@@ -389,8 +359,7 @@ samplesheet_wgs_entries() {
 }
 
 samplesheet_wts_entries() {
-  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_fwd,${input_fps['tumor_wts_fastq_fwd']}"
-  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,fastq_rev,${input_fps['tumor_wts_fastq_rev']}"
+  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,bam,${input_fps['tumor_wts_bam']}"
 }
 
 # Final upload data function
@@ -442,7 +411,11 @@ association_id=$(
 )
 aws ec2 replace-iam-instance-profile-association 1>/dev/null \
   --association-id "${association_id}" \
-  --iam-instance-profile "Name=$(get_batch_instance_profile_name)"
+  --iam-instance-profile "Arn=$(get_batch_instance_profile_arn_from_ssm)"
+
+## END LOCAL EXECUTOR WORKAROUND ##
+
+## RESUME BLOCK ##
 
 if [[ -n "${resume_nextflow_dir:-}" ]]; then
   aws s3 sync \
@@ -450,15 +423,14 @@ if [[ -n "${resume_nextflow_dir:-}" ]]; then
     "${resume_nextflow_dir}/" ./.nextflow/
 fi
 
-## END LOCAL EXECUTOR WORKAROUND ##
+## END RESUME BLOCK ##
 
 ## SAMPLESHEET PREP ##
 
 input_file_args='
 tumor_wgs_bam
 normal_wgs_bam
-tumor_wts_fastq_fwd
-tumor_wts_fastq_rev
+tumor_wts_bam
 '
 
 declare -A input_fps
@@ -523,15 +495,15 @@ fi
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
 if [[ ${mode} == 'wgs' ]]; then
-  nextflow_args='--processes_exclude star,isofox,chord,lilac,orange,peach,protect,sigs'
+  nextflow_args='--processes_exclude isofox,orange'
 elif [[ ${mode} == 'wts' ]]; then
-  nextflow_args='--mode manual --processes_include star,isofox,cuppa'
+  nextflow_args='--mode manual --processes_include isofox,cuppa'
 elif [[ ${mode} == 'wgts' ]]; then
-  nextflow_args='--processes_exclude chord,lilac,orange,peach,protect,sigs'
+  nextflow_args='--processes_exclude orange'
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
-  nextflow_args='--processes_exclude star,isofox,chord,lilac,orange,peach,protect,sigs'
+  nextflow_args='--processes_exclude isofox,orange'
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  nextflow_args='--mode manual --processes_include star,isofox,cuppa'
+  nextflow_args='--mode manual --processes_include isofox,cuppa'
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
   nextflow_args='--mode manual --processes_include cuppa'
 fi
@@ -547,8 +519,8 @@ sed \
   --regexp-extended \
   --expression \
     "
-      s#__S3_GENOMES_DATA_PATH__#$(get_genomes_path_from_ssm)#g;
-      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn)#g
+      s#__S3_GENOMES_DATA_PATH__#s3://$(get_genomes_path_from_ssm)#g;
+      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g
     " \
   "${TEMPLATE_CONFIG_PATH}" > "${NEXTFLOW_CONFIG_PATH}"
 
@@ -559,15 +531,17 @@ nextflow \
   -config "${NEXTFLOW_CONFIG_PATH}" \
   run "${MAIN_NF_PATH}" \
     -ansi-log "false" \
-    -profile "docker" \
-    -work-dir "s3://$(get_cache_bucket_from_ssm)$(get_cache_path_from_ssm)" \
     --monochrome_logs \
-    --input "samplesheet.csv" \
-    --outdir "${output_dir}/output/" \
-    --genome "${GENOME}" \
+    -profile "docker" \
+    -work-dir "s3://$(get_cache_bucket_from_ssm)/$(get_cache_prefix_from_ssm)" \
     ${nextflow_args} \
-    --ref_data_hmf_data_path "$(get_hmf_refdata_from_ssm)" \
-    --ref_data_virusbreakenddb_path "$(get_virusbreakend_db_from_ssm)"
+    --input "samplesheet.csv" \
+    --genome "GRCh38_umccr" \
+    --genome_version "38" \
+    --genome_type "alt" \
+    --ref_data_hmf_data_path "s3://$(get_hmf_refdata_from_ssm)" \
+    --ref_data_virusbreakenddb_path "s3://$(get_virusbreakend_db_from_ssm)" \
+    --outdir "${output_dir%/}/output/"
 
 # Upload data cleanly
 upload_data

@@ -1,37 +1,32 @@
-import { Construct } from 'constructs';
-import {Stack, StackProps} from "aws-cdk-lib";
+import {Construct} from 'constructs';
 
+import {Stack, StackProps} from "aws-cdk-lib";
 import {
   AllocationStrategy,
   ComputeEnvironment,
   ComputeResourceType,
   JobQueue,
-  LaunchTemplateSpecification
+  LaunchTemplateSpecification,
 } from "@aws-cdk/aws-batch-alpha";
-
 import {
-  InstanceType,
   ISecurityGroup,
   IVpc,
+  InstanceType,
   LaunchTemplate,
   SecurityGroup,
   SubnetType,
   UserData,
-  Vpc
+  Vpc,
 } from "aws-cdk-lib/aws-ec2";
-
-import {
-  EcsOptimizedImage
-} from "aws-cdk-lib/aws-ecs";
-
+import {EcsOptimizedImage} from "aws-cdk-lib/aws-ecs";
 import {
   CfnInstanceProfile,
   ManagedPolicy,
   Role,
-  ServicePrincipal
+  ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 
-import {getBaseBatchInstancePipelineRole, getRoleBatchInstanceTask} from "./common";
+import {getBaseBatchInstancePipelineRole, getRoleBatchInstanceTask} from "./base-roles";
 
 
 interface IBatchComputeData {
@@ -80,6 +75,8 @@ const batchComputeTask: IBatchComputeData[] = [
     ],
   },
 
+  */
+
   {
     name: '4cpu_16gb',
     costModel: ComputeResourceType.SPOT,
@@ -89,8 +86,6 @@ const batchComputeTask: IBatchComputeData[] = [
       'm6i.xlarge',
     ],
   },
-
-  */
 
   {
     name: '4cpu_32gb',
@@ -147,16 +142,16 @@ const batchComputeTask: IBatchComputeData[] = [
 ];
 
 
-export class SharedStack extends Stack {
+export class BasePipelineStack extends Stack {
   public readonly jobQueueTaskArns: Map<string, string> = new Map();
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
 
-    // Shared general resources
+    // General resources
     const vpc = Vpc.fromLookup(this, 'MainVPC', {
-        vpcName: 'main-vpc',
+      vpcName: 'main-vpc',
     });
 
     const securityGroup = SecurityGroup.fromLookupByName(
@@ -168,18 +163,18 @@ export class SharedStack extends Stack {
 
 
     // Task Batch compute environment and job queue
-    const launchTemplateTask = this.getLaunchTemplateSpec({ namespace: 'SharedTask', volumeSize: 500 });
+    const launchTemplateTask = this.getLaunchTemplateSpec({ namespace: 'BaseTask', volumeSize: 500 });
 
     // NOTE(SW): default job role and should be overridden by a custom job role defined in an individual stack
     const roleBatchInstanceTask = getRoleBatchInstanceTask({
       context: this,
-      namePrefix: 'Shared',
+      namePrefix: 'Base',
     });
-    const profileBatchInstanceTask = new CfnInstanceProfile(this, 'SharedTaskBatchInstanceProfile', {
+    const profileBatchInstanceTask = new CfnInstanceProfile(this, 'BaseTaskBatchInstanceProfile', {
       roles: [roleBatchInstanceTask.roleName],
     });
 
-    const roleBatchSpotfleetTask = new Role(this, 'SharedTaskBatchSpotFleetRole', {
+    const roleBatchSpotfleetTask = new Role(this, 'BaseTaskBatchSpotFleetRole', {
       assumedBy: new ServicePrincipal('spotfleet.amazonaws.com'),
       managedPolicies: [
         ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2SpotFleetTaggingRole'),
@@ -207,15 +202,15 @@ export class SharedStack extends Stack {
 
 
     // Pipeline Batch compute environment and job queue
-    const launchTemplatePipeline = this.getLaunchTemplateSpec({ namespace: 'SharedPipeline', volumeSize: 50 });
+    const launchTemplatePipeline = this.getLaunchTemplateSpec({ namespace: 'BasePipeline', volumeSize: 50 });
 
     const jobQueueTaskArnsArray = Array.from(this.jobQueueTaskArns.values());
     const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole({
       context: this,
-      namePrefix: 'Shared',
+      namePrefix: 'Base',
       jobQueueArns: jobQueueTaskArnsArray,
     });
-    const profileBatchInstancePipeline = new CfnInstanceProfile(this, 'SharedPipelineBatchInstanceProfile', {
+    const profileBatchInstancePipeline = new CfnInstanceProfile(this, 'BasePipelineBatchInstanceProfile', {
       roles: [roleBatchInstancePipeline.roleName],
     });
 
@@ -296,7 +291,7 @@ chmod 777 /mnt/local_ephemeral/
       throw new Error('Got bad serviceType');
     }
 
-    const computeEnvId = `Shared${args.serviceType}${categoryName}${queueNameSuffix}ComputeEnvironment`;
+    const computeEnvId = `Base{args.serviceType}${categoryName}${queueNameSuffix}ComputeEnvironment`;
     const computeEnvironment = new ComputeEnvironment(this, computeEnvId, {
       computeResources: {
         vpc: args.vpc,
@@ -320,7 +315,7 @@ chmod 777 /mnt/local_ephemeral/
     });
 
 
-    const jobQueueId = `Shared${args.serviceType}${categoryName}${queueNameSuffix}JobQueue`;
+    const jobQueueId = `Base{args.serviceType}${categoryName}${queueNameSuffix}JobQueue`;
     const jobQueue = new JobQueue(this, jobQueueId, {
       jobQueueName: `nextflow-${cname}`,
       computeEnvironments: [
@@ -331,3 +326,4 @@ chmod 777 /mnt/local_ephemeral/
   return [computeEnvironment, jobQueue];
   }
 }
+

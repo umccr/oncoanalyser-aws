@@ -9,3 +9,11 @@ cdk.out
 
 # Context json
 cdk.context.json
+
+# Other
+.nextflow*
+.DS_Store
+TODO.*md
+NOTES.md
+prev/
+temp/
