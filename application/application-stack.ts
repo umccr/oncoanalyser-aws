@@ -40,6 +40,7 @@ export class ApplicationStack extends Stack {
       props.envName,
       props.envBuild,
       stackPipelineBase.jobQueueTaskArns,
+      props.dockerTag,
     );
 
     this.buildStarAlignNfStack(
@@ -47,6 +48,7 @@ export class ApplicationStack extends Stack {
       props.envName,
       props.envBuild,
       stackPipelineBase.jobQueueTaskArns,
+      props.dockerTag,
     );
   }
 
@@ -55,6 +57,7 @@ export class ApplicationStack extends Stack {
     envName: string,
     envBuild: Environment,
     jobQueueTaskArns: Map<string, string>,
+    dockerTag?: string,
   ) {
     // Get settings
     const workflowName = 'oncoanalyser';
@@ -63,6 +66,7 @@ export class ApplicationStack extends Stack {
     // Create stack and add tags
     const pipelineStack = new OncoanalyserStack(this, 'OncoanalyserStack', {
       workflowName: workflowName,
+      dockerTag: dockerTag,
       jobQueueTaskArns: jobQueueTaskArns,
       env: env,
       envBuild: envBuild,
@@ -91,6 +95,7 @@ export class ApplicationStack extends Stack {
     envName: string,
     envBuild: Environment,
     jobQueueTaskArns: Map<string, string>,
+    dockerTag?: string,
   ) {
     // Get settings
     const workflowName = 'star-align-nf';
@@ -99,6 +104,7 @@ export class ApplicationStack extends Stack {
     // Create stack and add tags
     const pipelineStack = new StarAlignNfStack(this, 'StarAlignNfStack', {
       workflowName: workflowName,
+      dockerTag: dockerTag,
       jobQueueTaskArns: jobQueueTaskArns,
       env: env,
       envBuild: envBuild,
