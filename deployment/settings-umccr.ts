@@ -18,7 +18,7 @@ export const AWS_ENV_BUILD: IEnvironmentExtra = {
 };
 
 export const AWS_ENV_STG: IEnvironmentExtra = {
-  name: "staging",
+  name: "stg",
   account: "455634345446",
   region: "ap-southeast-2",
 };
