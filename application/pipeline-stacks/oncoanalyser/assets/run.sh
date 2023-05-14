@@ -495,17 +495,19 @@ fi
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
 if [[ ${mode} == 'wgs' ]]; then
-  nextflow_args='--processes_exclude isofox,orange'
+  nextflow_args='--processes_exclude isofox'
 elif [[ ${mode} == 'wts' ]]; then
   nextflow_args='--mode manual --processes_include isofox,cuppa'
 elif [[ ${mode} == 'wgts' ]]; then
-  nextflow_args='--processes_exclude orange'
+  : '
+  pass
+  '
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
-  nextflow_args='--processes_exclude isofox,orange'
+  nextflow_args='--processes_exclude isofox'
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  nextflow_args='--mode manual --processes_include isofox,cuppa'
+  nextflow_args='--mode manual --processes_include isofox,lilac,cuppa'
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
-  nextflow_args='--mode manual --processes_include cuppa'
+  nextflow_args='--mode manual --processes_include lilac,cuppa'
 fi
 
 if [[ -n "${resume_nextflow_dir:-}" ]]; then
