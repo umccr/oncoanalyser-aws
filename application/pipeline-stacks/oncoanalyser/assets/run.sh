@@ -543,7 +543,7 @@ nextflow \
     --genome_type "alt" \
     --ref_data_hmf_data_path "s3://$(get_hmf_refdata_from_ssm)" \
     --ref_data_virusbreakenddb_path "s3://$(get_virusbreakend_db_from_ssm)" \
-    --outdir "${output_dir%/}/output/"
+    --outdir "${output_dir}/output/"
 
 # Upload data cleanly
 upload_data

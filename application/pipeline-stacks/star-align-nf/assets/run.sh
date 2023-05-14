@@ -321,7 +321,7 @@ nextflow \
     --monochrome_logs \
     --input samplesheet.csv \
     --star_index_path s3://$(get_star_index_from_ssm)/ \
-    --outdir ${output_dir%/}/output/
+    --outdir ${output_dir}/output/
 
 # Upload data cleanly
 upload_data
