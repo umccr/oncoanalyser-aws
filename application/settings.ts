@@ -13,7 +13,7 @@ export function getSettings(envName: string, workflowName: string) {
     ["refdataPrefix", "workflow_data"],
     // oncoanalyser
     ["refdataGenomesPath", "genomes"],
-    ["refdataHmfPath", "hmf_reference_data/repacks/5.32+dev1_38_0.0.2"],
+    ["refdataHmfPath", "hmf_reference_data/repacks/5.32_38_0.0.1"],
     ["refDataVirusbreakendDbPath", "virusbreakend/virusbreakenddb_20210401"],
     // star-align-nf
     ["refdataStarIndexPath", "genomes/GRCh38_umccr/star_index/gencode_38/2.7.3a"],
