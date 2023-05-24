@@ -101,15 +101,15 @@ get_ssm_parameter_value(){
 }
 
 get_nf_bucket_name_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_name"
+  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_name"
 }
 
 get_nf_bucket_temp_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_temp_prefix"
+  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_temp_prefix"
 }
 
 get_nf_bucket_output_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_output_prefix"
+  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_output_prefix"
 }
 
 get_batch_instance_role_arn_from_ssm(){
@@ -120,6 +120,10 @@ get_batch_instance_profile_arn_from_ssm(){
   get_ssm_parameter_value "/nextflow_stack/star-align-nf/batch_instance_task_profile_arn"
 }
 
+get_star_index_from_ssm(){
+  get_ssm_parameter_value "/nextflow_stack/star-align-nf/refdata_star_index"
+}
+
 get_ica_access_token_from_secrets_manager(){
   aws secretsmanager get-secret-value \
     --secret-id IcaSecretsPortal \
@@ -128,10 +132,6 @@ get_ica_access_token_from_secrets_manager(){
     '
       .SecretString
     '
-}
-
-get_star_index_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/star-align-nf/refdata_star_index"
 }
 
 stage_gds_fp() {
