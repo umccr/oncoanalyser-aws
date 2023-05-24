@@ -1,16 +1,81 @@
 import {Stack} from 'aws-cdk-lib'
 import {
+  CfnInstanceProfile,
   CompositePrincipal,
+  IRole,
   ManagedPolicy,
   Policy,
   PolicyStatement,
   Role,
   ServicePrincipal,
 } from 'aws-cdk-lib/aws-iam'
+import {Secret} from "aws-cdk-lib/aws-secretsmanager";
 
 
-export function getRoleBatchInstanceTask(args: { context: Stack, namePrefix: string }) {
-  return new Role(args.context, `${args.namePrefix}TaskBatchInstanceRole`, {
+export function createPipelineRoles(args: { context: Stack, workflowName: string, jobQueueArns: string[] }) {
+    // Task and pipeline role
+    const roleBatchInstanceTask = getRoleBatchInstanceTask(args);
+    const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole(args);
+
+    // Profiles
+    const profileBatchInstanceTask = new CfnInstanceProfile(args.context, `TaskBatchInstanceProfile-${args.workflowName}`, {
+      roles: [roleBatchInstanceTask.roleName],
+    });
+    const profileBatchInstancePipeline = new CfnInstanceProfile(args.context, `PipelineBatchInstanceProfile-${args.workflowName}`, {
+      roles: [roleBatchInstancePipeline.roleName],
+    });
+
+    // Additional policies for pipelines
+    //   * iam:PassRole
+    //      - Nextflow requirement for Batch job submission
+    //
+    //   * ec2:DescribeIamInstanceProfileAssociations
+    //      - required for locally launched Docker containers
+    //      - these containers inherit instance role, which is the SharedStack pipeline role
+    //      - usually need at least S3 write permissions hence require setting the correct role to inherit at runtime
+    //
+    //   * secretsmanager:DescribeSecret, secretsmanager:GetSecretValue
+    //      - required staging data from GDS
+    //
+    roleBatchInstancePipeline.attachInlinePolicy(
+      new Policy(args.context, `PipelinePolicyPassRole-${args.workflowName}`, {
+        statements: [
+          new PolicyStatement({
+            actions: ['iam:PassRole'],
+            resources: [roleBatchInstanceTask.roleArn],
+          })
+        ],
+      })
+    );
+
+    roleBatchInstancePipeline.attachInlinePolicy(
+      new Policy(args.context, `PipelinePolicySetInstanceRole-${args.workflowName}`, {
+        statements: [
+          new PolicyStatement({
+            actions: [
+              'ec2:DescribeIamInstanceProfileAssociations',
+              // NOTE(SW): this /only/ allows passing the task role that is defined above
+              'ec2:ReplaceIamInstanceProfileAssociation',
+            ],
+            resources: ['*'],
+          })
+        ],
+      })
+    );
+
+    const icaSecret = Secret.fromSecretNameV2(args.context, `IcaSecret-${args.workflowName}`, "IcaSecretsPortal");
+    icaSecret.grantRead(roleBatchInstancePipeline);
+
+    return {
+      taskRole: roleBatchInstanceTask,
+      taskProfile: profileBatchInstanceTask,
+      pipelineRole: roleBatchInstancePipeline,
+      pipelineProfile: profileBatchInstancePipeline,
+    }
+}
+
+export function getRoleBatchInstanceTask(args: { context: Stack, workflowName: string }) {
+  return new Role(args.context, `TaskBatchInstanceRole-${args.workflowName}`, {
     assumedBy: new CompositePrincipal(
       new ServicePrincipal('ec2.amazonaws.com'),
       new ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -23,10 +88,9 @@ export function getRoleBatchInstanceTask(args: { context: Stack, namePrefix: str
   });
 }
 
+export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflowName: string, jobQueueArns: string[] }) {
 
-export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePrefix: string, jobQueueArns: string[] }) {
-
-  const roleBatchInstance = new Role(args.context, `${args.namePrefix}PipelineBatchInstanceRole`, {
+  const rolePipeline = new Role(args.context, `PipelineBatchInstanceRole-${args.workflowName}`, {
     assumedBy: new CompositePrincipal(
       new ServicePrincipal('ec2.amazonaws.com'),
       new ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -41,8 +105,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
   // NOTE(SW): the below policies are mostly those described by the Nextflow documents, some minor changes have been
   // made so that the access is less permissive
 
-  new Policy(args.context, `${args.namePrefix}PipelinePolicyBatchJobs`, {
-    roles: [roleBatchInstance],
+  new Policy(args.context, `PipelinePolicyBatchJobs-${args.workflowName}`, {
+    roles: [rolePipeline],
     statements: [new PolicyStatement({
       actions: [
         'batch:CancelJob',
@@ -57,8 +121,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
     })],
   });
 
-  new Policy(args.context, `${args.namePrefix}PipelinePolicyBatchGeneral`, {
-    roles: [roleBatchInstance],
+  new Policy(args.context, `PipelinePolicyBatchGeneral-${args.workflowName}`, {
+    roles: [rolePipeline],
     statements: [new PolicyStatement({
       actions: [
         'batch:ListJobs',
@@ -73,8 +137,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
   });
 
 
-  new Policy(args.context, `${args.namePrefix}PipelinePolicyInstances`, {
-    roles: [roleBatchInstance],
+  new Policy(args.context, `PipelinePolicyInstances-${args.workflowName}`, {
+    roles: [rolePipeline],
     statements: [new PolicyStatement({
       actions: [
         'ecs:DescribeTasks',
@@ -88,8 +152,8 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
     })],
   });
 
-  new Policy(args.context, `${args.namePrefix}PipelinePolicyECR`, {
-    roles: [roleBatchInstance],
+  new Policy(args.context, `PipelinePolicyECR-${args.workflowName}`, {
+    roles: [rolePipeline],
     statements: [new PolicyStatement({
       actions: [
         'ecr:GetAuthorizationToken',
@@ -109,5 +173,5 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, namePre
     })],
   });
 
-  return roleBatchInstance;
+  return rolePipeline;
 }

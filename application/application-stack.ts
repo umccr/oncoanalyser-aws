@@ -1,5 +1,3 @@
-import 'source-map-support/register';
-
 import {Construct} from "constructs"
 
 import {
@@ -9,7 +7,6 @@ import {
   Stage,
   Tags,
 } from "aws-cdk-lib";
-import {StringParameter} from "aws-cdk-lib/aws-ssm";
 
 import {getSettings} from './settings';
 import {BasePipelineStack} from './base-pipeline-stack';
@@ -24,108 +21,61 @@ interface IApplicationBuildStackProps extends StackProps {
   dockerTag?: string;
 }
 
+interface IBuildStack extends IApplicationBuildStackProps {
+  workflowName: string,
+  jobQueueTaskArns: Map<string, string>,
+}
+
 export class ApplicationStack extends Stack {
   constructor(scope: Construct, id: string, props: IApplicationBuildStackProps) {
     super(scope, id, props);
 
-    // Create shared resources and add atgs
+    // Create shared resources and add tags
     const stackPipelineBase = new BasePipelineStack(this, 'BasePipelineStack', {
       env: props.env,
     });
     Tags.of(stackPipelineBase).add("Stack", "NextflowStack");
 
-    // Create individual workflow stacks
-    this.buildOncoanalyserStack(
-      props.env,
-      props.envName,
-      props.envBuild,
-      stackPipelineBase.jobQueueTaskArns,
-      props.dockerTag,
-    );
+    // Create individual pipeline stacks
+    this.buildOncoanalyserStack({
+      workflowName: 'oncoanalyser',
+      jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
+      ...props,
+    });
 
-    this.buildStarAlignNfStack(
-      props.env,
-      props.envName,
-      props.envBuild,
-      stackPipelineBase.jobQueueTaskArns,
-      props.dockerTag,
-    );
+    this.buildStarAlignNfStack({
+      workflowName: 'star-align-nf',
+      jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
+      ...props,
+    });
   }
 
-  buildOncoanalyserStack(
-    env: Environment,
-    envName: string,
-    envBuild: Environment,
-    jobQueueTaskArns: Map<string, string>,
-    dockerTag?: string,
-  ) {
-    // Get settings
-    const workflowName = 'oncoanalyser';
-    const settings = getSettings(envName, workflowName);
-
-    // Create stack and add tags
+  buildOncoanalyserStack(args: IBuildStack) {
+    const settings = getSettings(args.envName, args.workflowName);
     const pipelineStack = new OncoanalyserStack(this, 'OncoanalyserStack', {
-      workflowName: workflowName,
-      dockerTag: dockerTag,
-      jobQueueTaskArns: jobQueueTaskArns,
-      env: env,
-      envBuild: envBuild,
-      cache_bucket: settings.s3Data.get('nfCacheBucket')!,
-      cache_prefix: settings.s3Data.get('nfCachePrefix')!,
-      staging_bucket: settings.s3Data.get('nfStagingBucket')!,
-      staging_prefix: settings.s3Data.get('nfStagingPrefix')!,
-      output_bucket: settings.s3Data.get('nfOutputBucket')!,
-      output_prefix: settings.s3Data.get('nfOutputPrefix')!,
-      refdata_bucket: settings.s3Data.get('refdataBucket')!,
-      refdata_prefix: settings.s3Data.get('refdataPrefix')!,
+      ...args,
+      nfBucketName: settings.s3Data.get('nfBucketName')!,
+      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
+      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
+      ssmParameters: settings.ssmParameters,
     });
     Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
-
-    // Store SSM parameters
-    for (let [key, value] of settings.ssmParameters) {
-      new StringParameter(this, `SsmParameter-${workflowName}-${key.replace(/^.*\//, '')}`, {
-        parameterName: key,
-        stringValue: value,
-      });
-    }
   }
 
-  buildStarAlignNfStack(
-    env: Environment,
-    envName: string,
-    envBuild: Environment,
-    jobQueueTaskArns: Map<string, string>,
-    dockerTag?: string,
-  ) {
-    // Get settings
-    const workflowName = 'star-align-nf';
-    const settings = getSettings(envName, workflowName);
-
-    // Create stack and add tags
+  buildStarAlignNfStack(args: IBuildStack) {
+    const settings = getSettings(args.envName, args.workflowName);
     const pipelineStack = new StarAlignNfStack(this, 'StarAlignNfStack', {
-      workflowName: workflowName,
-      dockerTag: dockerTag,
-      jobQueueTaskArns: jobQueueTaskArns,
-      env: env,
-      envBuild: envBuild,
-      cache_bucket: settings.s3Data.get('nfCacheBucket')!,
-      cache_prefix: settings.s3Data.get('nfCachePrefix')!,
-      staging_bucket: settings.s3Data.get('nfStagingBucket')!,
-      staging_prefix: settings.s3Data.get('nfStagingPrefix')!,
-      output_bucket: settings.s3Data.get('nfOutputBucket')!,
-      output_prefix: settings.s3Data.get('nfOutputPrefix')!,
-      refdata_bucket: settings.s3Data.get('refdataBucket')!,
-      refdata_prefix: settings.s3Data.get('refdataPrefix')!,
+      ...args,
+      nfBucketName: settings.s3Data.get('nfBucketName')!,
+      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
+      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
+      ssmParameters: settings.ssmParameters,
     });
     Tags.of(pipelineStack).add('Stack', 'StarAlignNfStack');
-
-    // Store SSM parameters
-    for (let [key, value] of settings.ssmParameters) {
-      new StringParameter(this, `SsmParameter-${workflowName}-${key.replace(/^.*\//, '')}`, {
-        parameterName: key,
-        stringValue: value,
-      });
-    }
   }
 }
 

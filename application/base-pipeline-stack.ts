@@ -168,7 +168,7 @@ export class BasePipelineStack extends Stack {
     // NOTE(SW): default job role and should be overridden by a custom job role defined in an individual stack
     const roleBatchInstanceTask = getRoleBatchInstanceTask({
       context: this,
-      namePrefix: 'Base',
+      workflowName: 'base',
     });
     const profileBatchInstanceTask = new CfnInstanceProfile(this, 'BaseTaskBatchInstanceProfile', {
       roles: [roleBatchInstanceTask.roleName],
@@ -207,7 +207,7 @@ export class BasePipelineStack extends Stack {
     const jobQueueTaskArnsArray = Array.from(this.jobQueueTaskArns.values());
     const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole({
       context: this,
-      namePrefix: 'Base',
+      workflowName: 'base',
       jobQueueArns: jobQueueTaskArnsArray,
     });
     const profileBatchInstancePipeline = new CfnInstanceProfile(this, 'BasePipelineBatchInstanceProfile', {

@@ -15,7 +15,7 @@ NEXTFLOW_CONFIG_PATH="nextflow.config"
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam FILE --normal_wgs_bam FILE --output_dir S3_PREFIX
+Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam FILE --normal_wgs_bam FILE
 
 Options:
   --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
@@ -33,8 +33,6 @@ Options:
   --previous_run_dir FILE       Previous run directory containing inputs (expected to be S3 URI)
 
   --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
-
-  --output_dir S3_PREFIX        Output S3 prefix
 EOF
 }
 
@@ -86,11 +84,6 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
-    --output_dir)
-      output_dir="${2%/}"
-      shift 1
-    ;;
-
     -h|--help)
       print_help_text
       exit 0
@@ -112,7 +105,6 @@ fi
 
 required_args='
 subject_id
-output_dir
 '
 
 if [[ ${mode} == 'wgs' ]]; then
@@ -200,51 +192,76 @@ fi
 
 ## FUNCTIONS ##
 
-## SSM Parameter functions
-get_ssm_parameter_value(){
+get_output_directory() {
+  local sample_id_combined
+
+  if [[ -n "${tumor_wgs_id:-}" ]]; then
+    sample_id_combined=${tumor_wgs_id}
+  fi;
+
+  if [[ -n "${--normal_wgs_id:-}" ]]; then
+    sample_id_combined="${sample_id_combined}__${normal_wgs_id}"
+  fi;
+
+  if [[ -n "${tumor_wts_id:-}" ]]; then
+    sample_id_combined="${sample_id_combined}__${tumor_wts_id}"
+  fi;
+
+  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_id}/${mode}/${sample_id_combined}"
+}
+
+get_staging_directory() {
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_id}/staging"
+}
+
+get_scratch_directory() {
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_id}/scratch"
+}
+
+generate_portal_id() {
+  echo $(date '+%Y%m%d')$(openssl rand -hex 4)
+}
+
+get_ssm_parameter_value() {
   aws ssm get-parameter \
     --name "$1" \
     --output json |
   jq --raw-output '.Parameter | .Value'
 }
 
-get_cache_bucket_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/cache_bucket"
+get_nf_bucket_name_from_ssm() {
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_name"
 }
 
-get_cache_prefix_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/cache_prefix"
+get_nf_bucket_temp_prefix_from_ssm() {
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_temp_prefix"
 }
 
-get_dest_bucket_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/staging_bucket"
+get_nf_bucket_output_prefix_from_ssm() {
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_output_prefix"
 }
 
-get_dest_prefix_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/staging_prefix"
-}
-
-get_hmf_refdata_from_ssm(){
+get_hmf_refdata_from_ssm() {
   get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_hmf"
 }
 
-get_virusbreakend_db_from_ssm(){
+get_virusbreakend_db_from_ssm() {
   get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_virusbreakend"
 }
 
-get_genomes_path_from_ssm(){
+get_genomes_path_from_ssm() {
   get_ssm_parameter_value "/nextflow_stack/oncoanalyser/refdata_genomes"
 }
 
-get_batch_instance_role_arn_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_task_instance_role_arn"
+get_batch_instance_role_arn_from_ssm() {
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_instance_task_role_arn"
 }
 
-get_batch_instance_profile_arn_from_ssm(){
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_task_instance_profile_arn"
+get_batch_instance_profile_arn_from_ssm() {
+  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/batch_instance_task_profile_arn"
 }
 
-get_ica_access_token_from_secrets_manager(){
+get_ica_access_token_from_secrets_manager() {
   aws secretsmanager get-secret-value \
     --secret-id IcaSecretsPortal \
     --output json | \
@@ -270,10 +287,7 @@ stage_gds_fp() {
   local src_fp
 
 
-  dst_bucket="$(get_dest_bucket_from_ssm)"
-  dst_key_base="$(get_dest_prefix_from_ssm)"
-
-  dst_dp="${dst_bucket}/${dst_key_base}"
+  dst_dp="$(get_staging_directory)"
   dst_fp="${dst_dp}/${gds_fp##*/}"
 
   echo s3://${dst_fp}
@@ -375,23 +389,31 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
-## GET AWS REGION ##
+portal_id="$(generate_portal_id)"
+output_dir="s3://$(get_output_directory)"
+
+## SET AWS REGION ##
 
 # Get the current aws region
 # https://stackoverflow.com/questions/4249488/find-region-from-within-an-ec2-instance
-AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+export AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
 
-export AWS_REGION
-
+## END SET AWS REGION ##
 
 ## LOCAL EXECUTOR WORKAROUND ##
 
-# When Nextflow runs a job using the local executor with Docker enabled, I have configured behaviour such that that a
-# new Docker container from the host service is launched. This means that all local Nextflow processes inherit the EC2
-# instance IAM profile, which can only be set prior at the Batch compute environment creation; in this case that is the
-# non-permissive Nextflow pipeline role. This means to run Nextflow processes locally that can r/w to S3 (e.g. when
-# using Fusion, S3 output directory, etc), we must set the EC2 instance IAM role to a profile with such permissions.
-# Here I associate the instance with the OncoanalyserStack task role. There may be better approaches to achieve this.
+# This stack runs the main Nextflow pipeline process as a Batch job and therefore the pipeline process is executed
+# within a Docker container. Individual pipeline tasks are generally submitted as Batch jobs but can also be run
+# locally. Running a process locally is useful for very short jobs. In order to run a process locally, the pipeline must
+# execute the task within a Docker container. I have configured the Docker container that executes the Nextflow pipeline
+# process to use the host Docker service for local jobs.
+#
+# A consequence of this set up is that that all task run locally using Docker containers inherit the EC2 instance IAM
+# profile, which can only be set at creation of the Batch compute environment during stack deployment. In this case the
+# Batch compute environment uses the non-permissive Nextflow pipeline role. This means to run Nextflow processes locally
+# that can r/w to S3 (e.g. when using Fusion, S3 output directory, etc) we must manually set the EC2 instance IAM role
+# at runtime to a profile with the required permissions. Here I associate the instance with the OncoanalyserStack task
+# role. There may be better approaches to achieve this.
 
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 association_id=$(
@@ -535,16 +557,16 @@ nextflow \
     -ansi-log "false" \
     --monochrome_logs \
     -profile "docker" \
-    -work-dir "s3://$(get_cache_bucket_from_ssm)/$(get_cache_prefix_from_ssm)" \
+    -work-dir "s3://$(get_scratch_directory)/" \
     ${nextflow_args} \
     --input "samplesheet.csv" \
     --genome "GRCh38_umccr" \
     --genome_version "38" \
     --genome_type "alt" \
     --force_genome \
-    --ref_data_hmf_data_path "s3://$(get_hmf_refdata_from_ssm)" \
-    --ref_data_virusbreakenddb_path "s3://$(get_virusbreakend_db_from_ssm)" \
-    --outdir "${output_dir}/output/"
+    --ref_data_hmf_data_path "s3://$(get_hmf_refdata_from_ssm)/" \
+    --ref_data_virusbreakenddb_path "s3://$(get_virusbreakend_db_from_ssm)/" \
+    --outdir "${output_dir}/"
 
 # Upload data cleanly
 upload_data
