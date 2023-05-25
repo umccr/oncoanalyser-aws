@@ -74,7 +74,7 @@ export class PipelineStack extends Stack {
     refdataBucket.grantRead(stackRoles.pipelineRole, `${props.refdataPrefix}/*`);
 
     // Create job definition for pipeline execution
-    new JobDefinition(this, `JobDefinition-${props.workflowName}`, {
+    new JobDefinition(this, `Nextflow-${props.workflowName}`, {
       container: {
         image: dockerStack.image,
         command: ['true'],
