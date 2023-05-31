@@ -111,6 +111,7 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflo
       actions: [
         'batch:CancelJob',
         'batch:SubmitJob',
+        'batch:TagResource',
         'batch:TerminateJob',
       ],
 
@@ -135,7 +136,6 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflo
       resources: ['*']
     })],
   });
-
 
   new Policy(args.context, `PipelinePolicyInstances-${args.workflowName}`, {
     roles: [rolePipeline],
