@@ -81,9 +81,8 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '4cpu_16gb',
     costModel: ComputeResourceType.SPOT,
     instances: [
-      'm4.xlarge',
-      'm5.xlarge',
-      'm6i.xlarge',
+      'm5d.xlarge',
+      'm6id.xlarge',
     ],
   },
 
