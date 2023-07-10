@@ -18,7 +18,7 @@ print_help_text() {
 Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam FILE --normal_wgs_bam FILE
 
 Options:
-  --mode STR                    Mode to run (relative to CUPPA) [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
+  --mode STR                    Mode to run [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
   --subject_id STR              Subject identifier
 
@@ -30,7 +30,8 @@ Options:
   --tumor_wts_id STR            Tumor WTS identifier
   --tumor_wts_bam FILE          Input tumor WTS BAM
 
-  --previous_run_dir FILE       Previous run directory containing inputs (expected to be S3 URI)
+  --existing_wgs_dir DIR        Existing WGS run directory (expected to be S3 URI)
+  --existing_wts_dir DIR        Existing WGS run directory (expected to be S3 URI)
 
   --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
 EOF
@@ -74,8 +75,12 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
-    --previous_run_dir)
-      previous_run_dir="${2%/}"
+    --existing_wgs_dir)
+      existing_wgs_dir="${2%/}"
+      shift 1
+    ;;
+    --existing_wts_dir)
+      existing_wts_dir="${2%/}"
       shift 1
     ;;
 
@@ -97,14 +102,17 @@ if [[ -z "${mode:-}" ]]; then
   exit 1
 fi
 
-if [[ ${mode} == 'wts' || ${mode} == 'wgts_existing_wts' || ${mode} == 'wgts_existing_both' ]]; then
-  print_help_text
-  echo -e "\nERROR: --mode ${mode} is not currently supported; currently unable to generate WTS-only CUPPA visualisations" 1>&2
-  exit 1
-fi
-
 required_args='
 subject_id
+'
+
+required_args_wgts='
+tumor_wgs_id
+normal_wgs_id
+tumor_wgs_bam
+normal_wgs_bam
+tumor_wts_id
+tumor_wts_bam
 '
 
 if [[ ${mode} == 'wgs' ]]; then
@@ -120,38 +128,23 @@ elif [[ ${mode} == 'wts' ]]; then
   tumor_wts_bam
   '
 elif [[ ${mode} == 'wgts' ]]; then
-  required_args+='
-  tumor_wgs_id
-  normal_wgs_id
-  tumor_wgs_bam
-  normal_wgs_bam
-  tumor_wts_id
-  tumor_wts_bam
-  '
+  required_args+="${required_args_wgts}"
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  required_args+='
-  tumor_wgs_id
-  normal_wgs_id
-  tumor_wts_id
-  tumor_wts_bam
-  previous_run_dir
-  '
+  required_args+="
+  ${required_args_wgts}
+  existing_wgs_dir
+  "
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
-  required_args+='
-  tumor_wgs_id
-  normal_wgs_id
-  tumor_wgs_bam
-  normal_wgs_bam
-  tumor_wts_id
-  previous_run_dir
-  '
+  required_args+="
+  ${required_args_wgts}
+  existing_wts_dir
+  "
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
-  required_args+='
-  tumor_wgs_id
-  normal_wgs_id
-  tumor_wts_id
-  previous_run_dir
-  '
+  required_args+="
+  ${required_args_wgts}
+  existing_wgs_dir
+  existing_wts_dir
+  "
 else
   print_help_text
   echo "--mode got unexpected value: ${mode}" 1>&2
@@ -193,21 +186,23 @@ fi
 ## FUNCTIONS ##
 
 get_output_directory() {
-  local sample_id_combined
+  local -a sample_ids
 
   if [[ -n "${tumor_wgs_id:-}" ]]; then
-    sample_id_combined=${tumor_wgs_id}
+    sample_ids+=(${tumor_wgs_id})
   fi;
 
-  if [[ -n "${--normal_wgs_id:-}" ]]; then
-    sample_id_combined="${sample_id_combined}__${normal_wgs_id}"
+  if [[ -n "${normal_wgs_id:-}" ]]; then
+    sample_ids+=(${normal_wgs_id})
   fi;
 
   if [[ -n "${tumor_wts_id:-}" ]]; then
-    sample_id_combined="${sample_id_combined}__${tumor_wts_id}"
+    sample_ids+=(${tumor_wts_id})
   fi;
 
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_id}/${mode}/${sample_id_combined}"
+  sample_ids_str=$(sed 's/ /__/g' <<< ${sample_ids[@]})
+
+  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_id}/${mode}/${sample_ids_str}"
 }
 
 get_staging_directory() {
@@ -475,39 +470,75 @@ id,subject_name,sample_name,sample_type,sequence_type,filetype,filepath
 EOF
 
 if [[ ${mode} == 'wgs' ]]; then
+
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 EOF
+
 elif [[ ${mode} == 'wts' ]]; then
+
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wts_entries "${tumor_wts_id}")
 EOF
+
 elif [[ ${mode} == 'wgts' ]]; then
+
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 $(samplesheet_wts_entries "${tumor_wgs_id}")
 EOF
+
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
+
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${previous_run_dir}/isofox/
+$(samplesheet_wts_entries "${tumor_wgs_id}")
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
 EOF
+
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  cat <<EOF >> samplesheet.csv
-$(samplesheet_wts_entries "${tumor_wgs_id}")
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${previous_run_dir}/purple/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
-EOF
-elif [[ ${mode} == 'wgts_existing_both' ]]; then
+
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 $(samplesheet_wts_entries "${tumor_wgs_id}")
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${previous_run_dir}/purple/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${previous_run_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${previous_run_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${previous_run_dir}/isofox/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_id}.wgsmetrics
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_id}.wgsmetrics
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_id}.flagstat
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_id}.flagstat
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.gene.coverage.tsv
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_id}_chord_prediction.txt
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
 EOF
+
+elif [[ ${mode} == 'wgts_existing_both' ]]; then
+
+  cat <<EOF >> samplesheet.csv
+$(samplesheet_wgs_entries)
+$(samplesheet_wts_entries "${tumor_wgs_id}")
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_id}.wgsmetrics
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_id}.wgsmetrics
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_id}.flagstat
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_id}.flagstat
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.gene.coverage.tsv
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_id}_chord_prediction.txt
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
+${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
+EOF
+
 fi
 
 ## END SAMPLESHEET PREP ##
@@ -517,19 +548,17 @@ fi
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
 if [[ ${mode} == 'wgs' ]]; then
-  nextflow_args='--processes_exclude isofox'
+  nextflow_args='--run_mode wgs --run_type tumor_normal'
 elif [[ ${mode} == 'wts' ]]; then
-  nextflow_args='--mode manual --processes_include isofox,cuppa'
+  nextflow_args='--run_mode wts'
 elif [[ ${mode} == 'wgts' ]]; then
-  : '
-  pass
-  '
+  nextflow_args='--run_mode wgts --run_type tumor_normal'
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
-  nextflow_args='--processes_exclude isofox'
+  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_exclude isofox'
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  nextflow_args='--mode manual --processes_include isofox,lilac,cuppa'
+  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_manual --processes_include isofox,lilac,cuppa,orange'
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
-  nextflow_args='--mode manual --processes_include lilac,cuppa'
+  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_manual --processes_include lilac,cuppa,orange'
 fi
 
 if [[ -n "${resume_nextflow_dir:-}" ]]; then
