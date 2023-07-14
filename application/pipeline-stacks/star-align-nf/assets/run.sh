@@ -3,11 +3,15 @@ set -euo pipefail
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --subject_id STR --sample_id STR --fastq_fwd FILE --fastq_rev FILE
+Usage example: run.sh --subject_id STR --sample_id STR --library_id STR --fastq_fwd FILE --fastq_rev FILE
 
 Options:
+  --portal_id STR               Portal ID (out-of-band Portal ID will be generated if not provided)
+
   --subject_id STR              Subject identifier
-  --sample_id STR               Tumor WTS identifier
+
+  --sample_id STR               Tumor WTS sample identifier
+  --library_id STR              Tumor WTS library identifier
 
   --fastq_fwd FILE              Input tumor WTS forward FASTQ
   --fastq_rev FILE              Input tumor WTS reverse FASTQ
@@ -17,12 +21,22 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
 
+    --portal_id)
+      portal_id="$2"
+      shift 1
+    ;;
+
     --subject_id)
       subject_id="$2"
       shift 1
     ;;
+
     --sample_id)
       sample_id="$2"
+      shift 1
+    ;;
+    --library_id)
+      library_id="$2"
       shift 1
     ;;
 
@@ -45,6 +59,7 @@ done
 required_args='
 subject_id
 sample_id
+library_id
 fastq_fwd
 fastq_rev
 '
@@ -78,7 +93,7 @@ fi
 
 ## SSM Parameter functions
 get_output_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/star-align-nf/${portal_id}/${sample_id}"
+  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/star-align-nf/${portal_id}/${library_id}"
 }
 
 get_staging_directory() {
@@ -239,7 +254,10 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
-portal_id="$(generate_portal_id)"
+if [[ -z "${portal_id:-}" ]]; then
+  portal_id="$(generate_portal_id)"
+fi
+
 output_dir="s3://$(get_output_directory)"
 
 ## SET AWS REGION ##

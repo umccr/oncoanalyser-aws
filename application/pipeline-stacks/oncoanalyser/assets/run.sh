@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
 ## GLOBALS ##
@@ -15,23 +14,29 @@ NEXTFLOW_CONFIG_PATH="nextflow.config"
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_id STR --normal_wgs_id STR --tumor_wgs_bam FILE --normal_wgs_bam FILE
+Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_sample_id STR --tumor_wgs_library_id STR --tumor_wgs_bam FILE --normal_wgs_sample_id STR --normal_wgs_library_id STR --normal_wgs_bam FILE
 
 Options:
   --mode STR                    Mode to run [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
+  --portal_id STR               Portal ID (out-of-band Portal ID will be generated if not provided)
+
   --subject_id STR              Subject identifier
 
-  --tumor_wgs_id STR            Tumor WGS identifier
-  --normal_wgs_id STR           Normal WGS identifier
+  --tumor_wgs_sample_id STR     Tumor WGS sample identifier
+  --tumor_wgs_library_id STR    Tumor WGS library identifier
   --tumor_wgs_bam FILE          Input tumor WGS BAM
+
+  --normal_wgs_sample_id STR    Normal WGS sample identifier
+  --normal_wgs_library_id STR   Normal WGS library identifier
   --normal_wgs_bam FILE         Input normal WGS BAM
 
-  --tumor_wts_id STR            Tumor WTS identifier
+  --tumor_wts_sample_id STR     Tumor WTS sample identifier
+  --tumor_wts_library_id STR    Tumor WTS library identifier
   --tumor_wts_bam FILE          Input tumor WTS BAM
 
-  --existing_wgs_dir DIR        Existing WGS run directory (expected to be S3 URI)
-  --existing_wts_dir DIR        Existing WGS run directory (expected to be S3 URI)
+  --existing_wgs_dir DIR        Existing WGS run directory (S3 URI)
+  --existing_wts_dir DIR        Existing WGS run directory (S3 URI)
 
   --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
 EOF
@@ -44,25 +49,35 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
+    --portal_id)
+      portal_id="$2"
+      shift 1
+    ;;
+
     --subject_id)
       subject_id="$2"
       shift 1
     ;;
-    --tumor_wgs_id)
-      tumor_wgs_id="$2"
+
+    --tumor_wgs_sample_id)
+      tumor_wgs_sample_id="$2"
       shift 1
     ;;
-    --normal_wgs_id)
-      normal_wgs_id="$2"
+    --tumor_wgs_library_id)
+      tumor_wgs_library_id="$2"
       shift 1
     ;;
-    --tumor_wts_id)
-      tumor_wts_id="$2"
+    --tumor_wgs_bam)
+      tumor_wgs_bam="$2"
       shift 1
     ;;
 
-    --tumor_wgs_bam)
-      tumor_wgs_bam="$2"
+    --normal_wgs_sample_id)
+      normal_wgs_sample_id="$2"
+      shift 1
+    ;;
+    --normal_wgs_library_id)
+      normal_wgs_library_id="$2"
       shift 1
     ;;
     --normal_wgs_bam)
@@ -70,6 +85,14 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
+    --tumor_wts_sample_id)
+      tumor_wts_sample_id="$2"
+      shift 1
+    ;;
+    --tumor_wts_library_id)
+      tumor_wts_library_id="$2"
+      shift 1
+    ;;
     --tumor_wts_bam)
       tumor_wts_bam="$2"
       shift 1
@@ -107,24 +130,30 @@ subject_id
 '
 
 required_args_wgts='
-tumor_wgs_id
-normal_wgs_id
+tumor_wgs_sample_id
+tumor_wgs_library_id
 tumor_wgs_bam
+normal_wgs_sample_id
+normal_wgs_library_id
 normal_wgs_bam
-tumor_wts_id
+tumor_wts_sample_id
+tumor_wts_library_id
 tumor_wts_bam
 '
 
 if [[ ${mode} == 'wgs' ]]; then
   required_args+='
-  tumor_wgs_id
-  normal_wgs_id
+  tumor_wgs_sample_id
+  tumor_wgs_library_id
   tumor_wgs_bam
+  normal_wgs_sample_id
+  normal_wgs_library_id
   normal_wgs_bam
   '
 elif [[ ${mode} == 'wts' ]]; then
   required_args+='
-  tumor_wts_id
+  tumor_wts_sample_id
+  tumor_wts_library_id
   tumor_wts_bam
   '
 elif [[ ${mode} == 'wgts' ]]; then
@@ -188,16 +217,16 @@ fi
 get_output_directory() {
   local -a sample_ids
 
-  if [[ -n "${tumor_wgs_id:-}" ]]; then
-    sample_ids+=(${tumor_wgs_id})
+  if [[ -n "${tumor_wgs_library_id:-}" ]]; then
+    sample_ids+=(${tumor_wgs_library_id})
   fi;
 
-  if [[ -n "${normal_wgs_id:-}" ]]; then
-    sample_ids+=(${normal_wgs_id})
+  if [[ -n "${normal_wgs_library_id:-}" ]]; then
+    sample_ids+=(${normal_wgs_library_id})
   fi;
 
-  if [[ -n "${tumor_wts_id:-}" ]]; then
-    sample_ids+=(${tumor_wts_id})
+  if [[ -n "${tumor_wts_library_id:-}" ]]; then
+    sample_ids+=(${tumor_wts_library_id})
   fi;
 
   sample_ids_str=$(sed 's/ /__/g' <<< ${sample_ids[@]})
@@ -363,12 +392,12 @@ EOF
 }
 
 samplesheet_wgs_entries() {
-  echo "${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bam,${input_fps['tumor_wgs_bam']}"
-  echo "${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bam,${input_fps['normal_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bam,${input_fps['tumor_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bam,${input_fps['normal_wgs_bam']}"
 }
 
 samplesheet_wts_entries() {
-  echo "${subject_id}_${1},${subject_id},${tumor_wts_id},tumor,wts,bam,${input_fps['tumor_wts_bam']}"
+  echo "${subject_id}_${1},${subject_id},${tumor_wts_sample_id},tumor,wts,bam,${input_fps['tumor_wts_bam']}"
 }
 
 # Final upload data function
@@ -384,7 +413,10 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
-portal_id="$(generate_portal_id)"
+if [[ -z "${portal_id:-}" ]]; then
+  portal_id="$(generate_portal_id)"
+fi
+
 output_dir="s3://$(get_output_directory)"
 
 ## SET AWS REGION ##
@@ -478,65 +510,65 @@ EOF
 elif [[ ${mode} == 'wts' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wts_entries "${tumor_wts_id}")
+$(samplesheet_wts_entries "${tumor_wts_sample_id}")
 EOF
 
 elif [[ ${mode} == 'wgts' ]]; then
 
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries "${tumor_wgs_id}")
+$(samplesheet_wts_entries "${tumor_wgs_sample_id}")
 EOF
 
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
 
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries "${tumor_wgs_id}")
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
+$(samplesheet_wts_entries "${tumor_wgs_sample_id}")
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
 EOF
 
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
 
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries "${tumor_wgs_id}")
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_id}.wgsmetrics
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_id}.wgsmetrics
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_id}.flagstat
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_id}.flagstat
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_id}.sage.bqr.png
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.bqr.png
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.gene.coverage.tsv
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_id}_chord_prediction.txt
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
+$(samplesheet_wts_entries "${tumor_wgs_sample_id}")
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_sample_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_sample_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_sample_id}.sage.gene.coverage.tsv
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_sample_id}.virus.annotated.tsv
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_sample_id}_chord_prediction.txt
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
 EOF
 
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
 
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
-$(samplesheet_wts_entries "${tumor_wgs_id}")
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_id}.wgsmetrics
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_id}.wgsmetrics
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_id}.flagstat
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_id}.flagstat
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_id}.sage.bqr.png
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.bqr.png
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_id}.sage.gene.coverage.tsv
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
-${subject_id}_${tumor_wgs_id},${subject_id},${normal_wgs_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_id}.virus.annotated.tsv
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_id}_chord_prediction.txt
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wgs_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
-${subject_id}_${tumor_wgs_id},${subject_id},${tumor_wts_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
+$(samplesheet_wts_entries "${tumor_wgs_sample_id}")
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${normal_wgs_sample_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_bqr,${existing_wgs_dir}/sage/somatic/${tumor_wgs_sample_id}.sage.bqr.png
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_coverage,${existing_wgs_dir}/sage/somatic/${tumor_wgs_sample_id}.sage.gene.coverage.tsv
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,virusinterpreter_tsv,${existing_wgs_dir}/virusinterpreter/${tumor_wgs_sample_id}.virus.annotated.tsv
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,chord_prediction,${existing_wgs_dir}/chord/${subject_id}_${tumor_wgs_sample_id}_chord_prediction.txt
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
 EOF
 
 fi

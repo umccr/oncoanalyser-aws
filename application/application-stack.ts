@@ -22,8 +22,9 @@ interface IApplicationBuildStackProps extends StackProps {
 }
 
 interface IBuildStack extends IApplicationBuildStackProps {
-  workflowName: string,
-  jobQueueTaskArns: Map<string, string>,
+  workflowName: string;
+  jobQueuePipelineArn: string;
+  jobQueueTaskArns: Map<string, string>;
 }
 
 export class ApplicationStack extends Stack {
@@ -39,12 +40,14 @@ export class ApplicationStack extends Stack {
     // Create individual pipeline stacks
     this.buildOncoanalyserStack({
       workflowName: 'oncoanalyser',
+      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
       jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
       ...props,
     });
 
     this.buildStarAlignNfStack({
       workflowName: 'star-align-nf',
+      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
       jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
       ...props,
     });

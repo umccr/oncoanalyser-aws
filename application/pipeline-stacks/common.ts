@@ -7,6 +7,8 @@ import {JobDefinition} from "@aws-cdk/aws-batch-alpha";
 import {DockerImageAsset} from 'aws-cdk-lib/aws-ecr-assets';
 import {Repository} from "aws-cdk-lib/aws-ecr";
 import {EcrImage} from 'aws-cdk-lib/aws-ecs';
+import {PolicyStatement, Policy, ManagedPolicy, ServicePrincipal, Role} from 'aws-cdk-lib/aws-iam'
+import {Code, Function as LambdaFunction, Runtime} from 'aws-cdk-lib/aws-lambda'
 import {Bucket} from "aws-cdk-lib/aws-s3";
 import {StringParameter} from "aws-cdk-lib/aws-ssm";
 
@@ -26,6 +28,7 @@ export interface IPipelineStack extends StackProps {
   envBuild: Environment;
   workflowName: string;
   dockerTag?: string;
+  jobQueuePipelineArn: string;
   jobQueueTaskArns: Map<string, string>;
   nfBucketName: string;
   nfPrefixTemp: string;
@@ -74,7 +77,7 @@ export class PipelineStack extends Stack {
     refdataBucket.grantRead(stackRoles.pipelineRole, `${props.refdataPrefix}/*`);
 
     // Create job definition for pipeline execution
-    new JobDefinition(this, `Nextflow-${props.workflowName}`, {
+    const pipelineJobDefinition = new JobDefinition(this, `Nextflow-${props.workflowName}`, {
       container: {
         image: dockerStack.image,
         command: ['true'],
@@ -99,11 +102,47 @@ export class PipelineStack extends Stack {
       },
     });
 
-    // Add SSM parameters for Batch task role and profile ARN
+    // Create Lambda function role
+    const lambdaSubmissionRole = new Role(this, `LambdaSubmitRole-${props.workflowName}`, {
+      assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMReadOnlyAccess'),
+        ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+      ]
+    });
+    new Policy(this, `LambdaBatchPolicy-${props.workflowName}`, {
+      roles: [lambdaSubmissionRole],
+      statements: [new PolicyStatement({
+        actions: [
+          'batch:SubmitJob',
+        ],
+        resources: [
+          props.jobQueuePipelineArn,
+          pipelineJobDefinition.jobDefinitionArn,
+        ],
+      })],
+    });
+
+    // Create Lambda function
+    const aws_lambda_function = new LambdaFunction(this, `LambdaSubmissionFunction-${props.workflowName}`, {
+      functionName: `${props.workflowName}-batch-job-submission`,
+      handler: 'lambda_code.main',
+      runtime: Runtime.PYTHON_3_9,
+      code: Code.fromAsset(pathjoin(__dirname, props.workflowName, 'lambda_functions', 'batch_job_submission')),
+      role: lambdaSubmissionRole
+    });
+
+    // Create SSM parameters
+    new StringParameter(this, `SsmParameter-batch_job_definition-${props.workflowName}`, {
+      parameterName: `/nextflow_stack/${props.workflowName}/batch_job_definition_arn`,
+      stringValue: pipelineJobDefinition.jobDefinitionArn,
+    });
+
     new StringParameter(this, `SsmParameter-batch_instance_task_role-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/batch_instance_task_role_arn`,
       stringValue: stackRoles.taskRole.roleArn,
     });
+
     new StringParameter(this, `SsmParameter-batch_instance_task_profile-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/batch_instance_task_profile_arn`,
       stringValue: stackRoles.taskProfile.attrArn,

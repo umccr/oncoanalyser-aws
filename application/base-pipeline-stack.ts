@@ -142,6 +142,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
 
 export class BasePipelineStack extends Stack {
+  public readonly jobQueuePipelineArn: string;
   public readonly jobQueueTaskArns: Map<string, string> = new Map();
 
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -221,6 +222,8 @@ export class BasePipelineStack extends Stack {
       securityGroup: securityGroup,
       serviceType: 'Pipeline',
     });
+
+    this.jobQueuePipelineArn = jobQueuePipeline.jobQueueArn;
   }
 
 
