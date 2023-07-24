@@ -30,9 +30,10 @@ import {getBaseBatchInstancePipelineRole, getRoleBatchInstanceTask} from "./base
 
 
 interface IBatchComputeData {
-  name: string,
-  costModel: ComputeResourceType,
-  instances: string[],
+  name: string;
+  costModel: ComputeResourceType;
+  instances: string[];
+  maxvCpus?: number;
 }
 
 // NOTE(SW): allowing only exactly one pipeline queue/env for now
@@ -122,6 +123,8 @@ const batchComputeTask: IBatchComputeData[] = [
       'c5d.4xlarge',
       'c6id.4xlarge',
     ],
+    // NOTE(SW): allow up to 16 concurrent jobs
+    maxvCpus: 256,
   },
 
   /*
@@ -306,7 +309,7 @@ chmod 777 /mnt/local_ephemeral/
           launchTemplateId: args.launchTemplate.launchTemplateId as string,
           version: '$Latest',
         },
-        maxvCpus: 128,
+        maxvCpus: args.batchComputeData.maxvCpus ?? 128,
         securityGroups: [args.securityGroup],
         spotFleetRole: args.roleBatchSpotfleet,
         vpcSubnets: {
