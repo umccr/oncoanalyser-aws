@@ -6,7 +6,7 @@ print_help_text() {
 Usage example: run.sh --subject_id STR --sample_id STR --library_id STR --fastq_fwd FILE --fastq_rev FILE
 
 Options:
-  --portal_id STR               Portal ID (out-of-band Portal ID will be generated if not provided)
+  --portal_run_id STR           Portal run ID (out-of-band Portal run ID will be generated if not provided)
 
   --subject_id STR              Subject identifier
 
@@ -21,8 +21,8 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
 
-    --portal_id)
-      portal_id="$2"
+    --portal_run_id)
+      portal_run_id="$2"
       shift 1
     ;;
 
@@ -93,18 +93,18 @@ fi
 
 ## SSM Parameter functions
 get_output_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/star-align-nf/${portal_id}/${library_id}"
+  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/star-align-nf/${portal_run_id}/${library_id}"
 }
 
 get_staging_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_id}/staging"
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_run_id}/staging"
 }
 
 get_scratch_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_id}/scratch"
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_run_id}/scratch"
 }
 
-generate_portal_id() {
+generate_portal_run_id() {
   echo $(date '+%Y%m%d')$(openssl rand -hex 4)
 }
 
@@ -254,8 +254,8 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
-if [[ -z "${portal_id:-}" ]]; then
-  portal_id="$(generate_portal_id)"
+if [[ -z "${portal_run_id:-}" ]]; then
+  portal_run_id="$(generate_portal_run_id)"
 fi
 
 output_dir="s3://$(get_output_directory)"

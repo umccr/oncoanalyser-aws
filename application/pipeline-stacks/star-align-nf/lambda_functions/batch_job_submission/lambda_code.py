@@ -19,7 +19,7 @@ def main(event, context):
 
     Event dict payload example:
     {
-        "portal_id": "20230530abcdefgh",
+        "portal_run_id": "20230530abcdefgh",
         "subject_id": "SBJ00001",
         "sample_id": "PRJ230002",
         "library_id": "L2300002",
@@ -87,7 +87,7 @@ def get_job_command(event):
 
     command_components = [
         './assets/run.sh',
-        f'--portal_id {event["portal_id"]}',
+        f'--portal_run_id {event["portal_run_id"]}',
         f'--subject_id {event["subject_id"]}',
         f'--sample_id {event["sample_id"]}',
         f'--library_id {event["library_id"]}',
@@ -101,7 +101,7 @@ def get_job_command(event):
 def validate_event_data(event):
 
     required_params = [
-        'portal_id',
+        'portal_run_id',
         'subject_id',
         'sample_id',
         'library_id',

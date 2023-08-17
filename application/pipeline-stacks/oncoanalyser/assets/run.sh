@@ -19,7 +19,7 @@ Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_sample_id STR --tu
 Options:
   --mode STR                    Mode to run [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
-  --portal_id STR               Portal ID (out-of-band Portal ID will be generated if not provided)
+  --portal_run_id STR           Portal run ID (out-of-band Portal run ID will be generated if not provided)
 
   --subject_id STR              Subject identifier
 
@@ -49,8 +49,8 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
-    --portal_id)
-      portal_id="$2"
+    --portal_run_id)
+      portal_run_id="$2"
       shift 1
     ;;
 
@@ -231,18 +231,18 @@ get_output_directory() {
 
   sample_ids_str=$(sed 's/ /__/g' <<< ${sample_ids[@]})
 
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_id}/${mode}/${sample_ids_str}"
+  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_run_id}/${mode}/${sample_ids_str}"
 }
 
 get_staging_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_id}/staging"
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_run_id}/staging"
 }
 
 get_scratch_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_id}/scratch"
+  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_run_id}/scratch"
 }
 
-generate_portal_id() {
+generate_portal_run_id() {
   echo $(date '+%Y%m%d')$(openssl rand -hex 4)
 }
 
@@ -413,8 +413,8 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
-if [[ -z "${portal_id:-}" ]]; then
-  portal_id="$(generate_portal_id)"
+if [[ -z "${portal_run_id:-}" ]]; then
+  portal_run_id="$(generate_portal_run_id)"
 fi
 
 output_dir="s3://$(get_output_directory)"

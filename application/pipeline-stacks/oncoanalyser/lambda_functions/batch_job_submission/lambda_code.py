@@ -20,7 +20,7 @@ def main(event, context):
     Event dict payload example:
     {
         "mode": "wgts_existing_both",
-        "portal_id": "20230530abcdefgh",
+        "portal_run_id": "20230530abcdefgh",
         "subject_id": "SBJ00001",
         "tumor_wgs_sample_id": "PRJ230001",
         "tumor_wgs_library_id": "L2300001",
@@ -104,7 +104,7 @@ def get_job_command(event):
 
     command_components = [
         './assets/run.sh',
-        f'--portal_id {event["portal_id"]}',
+        f'--portal_run_id {event["portal_run_id"]}',
         f'--mode {event["mode"]}',
         f'--subject_id {event["subject_id"]}',
     ]
@@ -171,7 +171,7 @@ def validate_event_data(event):
 
     required_params = [
         'mode',
-        'portal_id',
+        'portal_run_id',
         'subject_id',
     ]
 
