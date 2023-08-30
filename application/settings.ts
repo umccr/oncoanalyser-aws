@@ -40,6 +40,11 @@ export function getSettings(envName: string, workflowName: string) {
       ...ssmParametersShared.entries(),
       [`/nextflow_stack/${workflowName}/refdata_star_index`, `${refdataBasePath}/${s3Data.get("refdataStarIndexPath")!}`],
     ]);
+  } else if (workflowName == 'sash') {
+    ssmParameters = new Map([
+      ...ssmParametersShared.entries(),
+      [`/nextflow_stack/${workflowName}/refdata_basepath`, `${refdataBasePath}`],
+    ]);
   } else {
     throw new Error('Got bad workflow name');
   }

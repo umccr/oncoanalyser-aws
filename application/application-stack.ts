@@ -10,7 +10,9 @@ import {
 
 import {getSettings} from './settings';
 import {BasePipelineStack} from './base-pipeline-stack';
+
 import {OncoanalyserStack} from './pipeline-stacks/oncoanalyser/stack';
+import {SashStack} from './pipeline-stacks/sash/stack';
 import {StarAlignNfStack} from './pipeline-stacks/star-align-nf/stack';
 
 
@@ -45,6 +47,13 @@ export class ApplicationStack extends Stack {
       ...props,
     });
 
+    this.buildSashStack({
+      workflowName: 'sash',
+      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
+      jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
+      ...props,
+    });
+
     this.buildStarAlignNfStack({
       workflowName: 'star-align-nf',
       jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
@@ -65,6 +74,20 @@ export class ApplicationStack extends Stack {
       ssmParameters: settings.ssmParameters,
     });
     Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
+  }
+
+  buildSashStack(args: IBuildStack) {
+    const settings = getSettings(args.envName, args.workflowName);
+    const pipelineStack = new StarAlignNfStack(this, 'SashStack', {
+      ...args,
+      nfBucketName: settings.s3Data.get('nfBucketName')!,
+      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
+      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
+      ssmParameters: settings.ssmParameters,
+    });
+    Tags.of(pipelineStack).add('Stack', 'SashStack');
   }
 
   buildStarAlignNfStack(args: IBuildStack) {
