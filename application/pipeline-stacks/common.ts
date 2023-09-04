@@ -148,6 +148,11 @@ export class PipelineStack extends Stack {
       stringValue: stackRoles.taskProfile.attrArn,
     });
 
+    new StringParameter(this, `SsmParameter-submission_lambda-${props.workflowName}`, {
+      parameterName: `/nextflow_stack/${props.workflowName}/submission_lambda_arn`,
+      stringValue: aws_lambda_function.functionArn,
+    });
+
     // Store SSM parameters from settings
     for (let [key, value] of props.ssmParameters) {
       new StringParameter(this, `SsmParameter-${key.replace(/^.*\//, '')}-${props.workflowName}`, {
