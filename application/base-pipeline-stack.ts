@@ -123,7 +123,18 @@ const batchComputeTask: IBatchComputeData[] = [
       'c5d.4xlarge',
       'c6id.4xlarge',
     ],
-    // NOTE(SW): allow up to 16 concurrent jobs
+    // Allow up to 16 concurrent jobs
+    maxvCpus: 256,
+  },
+
+  {
+    name: '16cpu_128gb',
+    costModel: ComputeResourceType.SPOT,
+    instances: [
+      'r5d.4xlarge',
+      'r6id.4xlarge',
+    ],
+    // Allow up to 16 concurrent jobs
     maxvCpus: 256,
   },
 
