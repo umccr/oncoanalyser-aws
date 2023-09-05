@@ -20,7 +20,7 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
-ARG PIPELINE_GITHUB_REF="pipeline5-v5.33"
+ARG PIPELINE_GITHUB_REF="v0.1.0"
 ARG PIPELINE_GITHUB_REPO_URL="https://github.com/scwatts/oncoanalyser.git"
 
 # Configure Conda
