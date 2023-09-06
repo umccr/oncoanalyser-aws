@@ -57,7 +57,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '2cpu_16gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
      'r5d.large',
      'r5dn.large',
@@ -69,7 +69,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '4cpu_8gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
      'c5.xlarge',
      'c6i.xlarge',
@@ -80,7 +80,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '4cpu_16gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'm5d.xlarge',
       'm6id.xlarge',
@@ -89,7 +89,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '4cpu_32gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'r5d.xlarge',
       'r5dn.xlarge',
@@ -99,7 +99,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '8cpu_32gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'm5d.2xlarge',
       'm6id.2xlarge',
@@ -108,7 +108,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '8cpu_64gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'r5d.2xlarge',
       'r5dn.2xlarge',
@@ -118,7 +118,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '16cpu_32gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'c5d.4xlarge',
       'c6id.4xlarge',
@@ -188,6 +188,7 @@ export class BasePipelineStack extends Stack {
       roles: [roleBatchInstanceTask.roleName],
     });
 
+    // NOTE(SW): only required when using SPOT compute environment type, leaving here regardless
     const roleBatchSpotfleetTask = new Role(this, 'BaseTaskBatchSpotFleetRole', {
       assumedBy: new ServicePrincipal('spotfleet.amazonaws.com'),
       managedPolicies: [
@@ -286,28 +287,30 @@ chmod 777 /mnt/local_ephemeral/
     });
 
     let allocationStrategy;
-    let queueNameSuffix;
     switch (args.batchComputeData.costModel) {
       case ComputeResourceType.ON_DEMAND:
         allocationStrategy = AllocationStrategy.BEST_FIT;
-        queueNameSuffix = 'ondemand';
         break;
       case ComputeResourceType.SPOT:
         allocationStrategy = AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
-        queueNameSuffix = 'spot';
         break;
       default:
         throw new Error('Got bad allocation strategy');
     }
 
-    let cname = `${categoryName}-${queueNameSuffix}`;
-    if (args.serviceType === 'Task') {
-      cname = `task-${cname}`;
-    } else if (args.serviceType !== 'Pipeline') {
-      throw new Error('Got bad serviceType');
+    let cname;
+    switch (args.serviceType) {
+      case ('Task'):
+        cname = `task-${categoryName}`;
+        break;
+      case ('Pipeline'):
+        cname = categoryName;
+        break;
+      default:
+        throw new Error('Got bad serviceType');
     }
 
-    const computeEnvId = `Base{args.serviceType}${categoryName}${queueNameSuffix}ComputeEnvironment`;
+    const computeEnvId = `Base{args.serviceType}${categoryName}ComputeEnvironment`;
     const computeEnvironment = new ComputeEnvironment(this, computeEnvId, {
       computeResources: {
         vpc: args.vpc,
@@ -331,7 +334,7 @@ chmod 777 /mnt/local_ephemeral/
     });
 
 
-    const jobQueueId = `Base{args.serviceType}${categoryName}${queueNameSuffix}JobQueue`;
+    const jobQueueId = `Base{args.serviceType}${categoryName}JobQueue`;
     const jobQueue = new JobQueue(this, jobQueueId, {
       jobQueueName: `nextflow-${cname}`,
       computeEnvironments: [

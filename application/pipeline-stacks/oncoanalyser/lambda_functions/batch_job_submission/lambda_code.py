@@ -75,7 +75,7 @@ def get_job_data(event):
 
     job_name = f'oncoanalyser__{event["mode"]}__{event["subject_id"]}__{library_id_str}'
     job_definition_arn = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/batch_job_definition_arn')
-    job_queue_name = 'nextflow-pipeline-ondemand'
+    job_queue_name = 'nextflow-pipeline'
 
     command = get_job_command(event)
 
