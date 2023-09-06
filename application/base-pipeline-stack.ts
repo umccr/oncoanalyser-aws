@@ -129,7 +129,7 @@ const batchComputeTask: IBatchComputeData[] = [
 
   {
     name: '16cpu_128gb',
-    costModel: ComputeResourceType.SPOT,
+    costModel: ComputeResourceType.ON_DEMAND,
     instances: [
       'r5d.4xlarge',
       'r6id.4xlarge',
