@@ -38,6 +38,7 @@ Options:
   --existing_wgs_dir DIR        Existing WGS run directory (S3 URI)
   --existing_wts_dir DIR        Existing WGS run directory (S3 URI)
 
+  --custom_config STR           Custom Nextflow config as gzip compressed, base64 encoded string
   --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
 EOF
 }
@@ -104,6 +105,11 @@ while [ $# -gt 0 ]; do
     ;;
     --existing_wts_dir)
       existing_wts_dir="${2%/}"
+      shift 1
+    ;;
+
+    --custom_config)
+      custom_config="${2%/}"
       shift 1
     ;;
 
@@ -597,7 +603,7 @@ fi
 
 ## END NEXFLOW ARGS ##
 
-## CREATE NEXTFLOW CONFIG ##
+## CREATE NEXTFLOW CONFIGS ##
 sed \
   --regexp-extended \
   --expression \
@@ -606,6 +612,12 @@ sed \
       s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g
     " \
   "${TEMPLATE_CONFIG_PATH}" > "${NEXTFLOW_CONFIG_PATH}"
+
+if [[ -n "${custom_config:-}" ]]; then
+  base64 -d <<< "${custom_config}" | gzip -cd > custom.config
+  nextflow_args+=' -config custom.config'
+fi
+
 
 ## END CREATE NEXTFLOW CONFIG ##
 trap upload_data EXIT
