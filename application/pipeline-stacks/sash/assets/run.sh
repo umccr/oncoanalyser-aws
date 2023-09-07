@@ -7,7 +7,7 @@ set -euo pipefail
 ICA_BASE_URL="https://aps2.platform.illumina.com"
 MAIN_NF_PATH="software/sash/main.nf"
 TEMPLATE_CONFIG_PATH="/root/pipeline/assets/nextflow_aws.template.config"
-NEXTFLOW_CONFIG_PATH="nextflow.config"
+NEXTFLOW_CONFIG_PATH="aws.config"
 
 ## END GLOBALS ##
 

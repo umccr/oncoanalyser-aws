@@ -337,7 +337,7 @@ EOF
 ## CREATE NEXTFLOW CONFIG ##
 
 TEMPLATE_CONFIG_PATH="/root/pipeline/assets/nextflow_aws.template.config"
-NEXTFLOW_CONFIG_PATH="nextflow.config"
+NEXTFLOW_CONFIG_PATH="aws.config"
 
 sed \
   --regexp-extended \
