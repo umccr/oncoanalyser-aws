@@ -73,7 +73,7 @@ def get_job_data(event):
 
     library_id_str = get_library_id_string(event)
 
-    job_name = f'oncoanalyser__{event["mode"]}__{event["subject_id"]}__{library_id_str}'
+    job_name = f'oncoanalyser__{event["mode"]}__{event["subject_id"]}__{library_id_str}__{event["portal_run_id"]}'
     job_definition_arn = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/batch_job_definition_arn')
     job_queue_name = 'nextflow-pipeline'
 

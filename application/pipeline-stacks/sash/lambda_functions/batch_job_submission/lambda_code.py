@@ -66,7 +66,7 @@ def main(event, context):
 
 def get_job_data(event):
 
-    job_name = f'sash__{event["subject_id"]}__{event["tumor_library_id"]}__{event["normal_library_id"]}'
+    job_name = f'sash__{event["subject_id"]}__{event["tumor_library_id"]}__{event["normal_library_id"]}__{event["portal_run_id"]}'
     job_definition_arn = get_ssm_parameter_value('/nextflow_stack/sash/batch_job_definition_arn')
     job_queue_name = 'nextflow-pipeline'
 
