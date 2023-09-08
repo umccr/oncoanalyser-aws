@@ -128,6 +128,17 @@ const batchComputeTask: IBatchComputeData[] = [
   },
 
   {
+    name: '16cpu_64gb',
+    costModel: ComputeResourceType.ON_DEMAND,
+    instances: [
+      'm5d.4xlarge',
+      'm6id.4xlarge',
+    ],
+    // Allow up to 16 concurrent jobs
+    maxvCpus: 256,
+  },
+
+  {
     name: '16cpu_128gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
