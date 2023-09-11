@@ -8,7 +8,7 @@ import {
   Tags,
 } from "aws-cdk-lib";
 
-import {getSettings} from './settings';
+import * as settings from './settings';
 import {BasePipelineStack} from './base-pipeline-stack';
 
 import {OncoanalyserStack} from './pipeline-stacks/oncoanalyser/stack';
@@ -63,43 +63,52 @@ export class ApplicationStack extends Stack {
   }
 
   buildOncoanalyserStack(args: IBuildStack) {
-    const settings = getSettings(args.envName, args.workflowName);
+    const stackSettings = new settings.Oncoanalyser(args.envName, args.workflowName);
+    const s3Data = stackSettings.getS3Data();
+
     const pipelineStack = new OncoanalyserStack(this, 'OncoanalyserStack', {
       ...args,
-      nfBucketName: settings.s3Data.get('nfBucketName')!,
-      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
-      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
-      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
-      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
-      ssmParameters: settings.ssmParameters,
+      pipelineVersionTag: stackSettings.versionTag,
+      nfBucketName: s3Data.get('nfBucketName')!,
+      nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: s3Data.get('refdataBucketName')!,
+      refdataPrefix: s3Data.get('refdataPrefix')!,
+      ssmParameters: stackSettings.getSsmParameters(),
     });
     Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
   }
 
   buildSashStack(args: IBuildStack) {
-    const settings = getSettings(args.envName, args.workflowName);
+    const stackSettings = new settings.Sash(args.envName, args.workflowName);
+    const s3Data = stackSettings.getS3Data();
+
     const pipelineStack = new StarAlignNfStack(this, 'SashStack', {
       ...args,
-      nfBucketName: settings.s3Data.get('nfBucketName')!,
-      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
-      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
-      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
-      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
-      ssmParameters: settings.ssmParameters,
+      pipelineVersionTag: stackSettings.versionTag,
+      nfBucketName: s3Data.get('nfBucketName')!,
+      nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: s3Data.get('refdataBucketName')!,
+      refdataPrefix: s3Data.get('refdataPrefix')!,
+      ssmParameters: stackSettings.getSsmParameters(),
     });
     Tags.of(pipelineStack).add('Stack', 'SashStack');
   }
 
   buildStarAlignNfStack(args: IBuildStack) {
-    const settings = getSettings(args.envName, args.workflowName);
+    const stackSettings = new settings.StarAlignNf(args.envName, args.workflowName);
+    const s3Data = stackSettings.getS3Data();
+
     const pipelineStack = new StarAlignNfStack(this, 'StarAlignNfStack', {
       ...args,
-      nfBucketName: settings.s3Data.get('nfBucketName')!,
-      nfPrefixTemp: settings.s3Data.get('nfPrefixTemp')!,
-      nfPrefixOutput: settings.s3Data.get('nfPrefixOutput')!,
-      refdataBucketName: settings.s3Data.get('refdataBucketName')!,
-      refdataPrefix: settings.s3Data.get('refdataPrefix')!,
-      ssmParameters: settings.ssmParameters,
+      pipelineVersionTag: stackSettings.versionTag,
+      nfBucketName: s3Data.get('nfBucketName')!,
+      nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
+      nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
+      refdataBucketName: s3Data.get('refdataBucketName')!,
+      refdataPrefix: s3Data.get('refdataPrefix')!,
+      ssmParameters: stackSettings.getSsmParameters(),
     });
     Tags.of(pipelineStack).add('Stack', 'StarAlignNfStack');
   }

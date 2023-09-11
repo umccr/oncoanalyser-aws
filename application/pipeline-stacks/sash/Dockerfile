@@ -19,8 +19,11 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
+ARG PIPELINE_GITHUB_REF  // NOTE(SW): must be provided as build argument
 ARG PIPELINE_GITHUB_REPO_URL="https://github.com/scwatts/sash.git"
-ARG PIPELINE_GITHUB_REF="v0.1.1"
+
+RUN \
+  test -n "${PIPELINE_GITHUB_REF}" || (echo "PIPELINE_GITHUB_REF must be set" && false)
 
 # Configure Conda
 RUN \

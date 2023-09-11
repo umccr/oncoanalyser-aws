@@ -49,6 +49,13 @@ def main(event, context):
 
     job_data = get_job_data(event)
 
+    output_directory = get_output_results_dir(
+        event['subject_id'],
+        get_library_id_string(event),
+        event['portal_run_id'],
+        event['mode'],
+    )
+
     LOGGER.info(f'Compiled job data: {job_data}')
 
     response_job = CLIENT_BATCH.submit_job(
@@ -61,6 +68,12 @@ def main(event, context):
                 {'type': 'MEMORY', 'value': '15000'},
                 {'type': 'VCPU', 'value': '2'},
             ],
+        },
+        parameters={
+            'portal_run_id': event['portal_run_id'],
+            'workflow': f'oncoanalyser_{event["mode"]}',
+            'version': get_ssm_parameter_value('/nextflow_stack/oncoanalyser/pipeline_version_tag'),
+            'output': json.dumps({'output_directory': output_directory}),
         },
     )
 
@@ -100,13 +113,42 @@ def get_library_id_string(event):
     return '__'.join(lid for lid in library_ids if lid)
 
 
+def get_output_results_dir(subject_id, library_id_str, portal_run_id, mode):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/nf_bucket_name')
+    return f's3://{bucket_name}/analysis_data/{subject_id}/oncoanalyser/{portal_run_id}/{mode}/{library_id_str}'
+
+
+def get_output_scratch_dir(subject_id, portal_run_id):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/nf_bucket_name')
+    return f's3://{bucket_name}/temp_data/{subject_id}/oncoanalyser/{portal_run_id}/scratch'
+
+def get_output_staging_dir(subject_id, portal_run_id):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/nf_bucket_name')
+    return f's3://{bucket_name}/temp_data/{subject_id}/oncoanalyser/{portal_run_id}/staging'
+
+
 def get_job_command(event):
+
+    output_results_dir = get_output_results_dir(
+        event['subject_id'],
+        get_library_id_string(event),
+        event['portal_run_id'],
+        event['mode'],
+    )
+    output_scratch_dir = get_output_scratch_dir(event['subject_id'], event['portal_run_id'])
+    output_staging_dir = get_output_staging_dir(event['subject_id'], event['portal_run_id'])
 
     command_components = [
         './assets/run.sh',
         f'--portal_run_id {event["portal_run_id"]}',
         f'--mode {event["mode"]}',
         f'--subject_id {event["subject_id"]}',
+        f'--output_results_dir {output_results_dir}',
+        f'--output_staging_dir {output_scratch_dir}',
+        f'--output_scratch_dir {output_staging_dir}',
     ]
 
     command_components_wgs = [

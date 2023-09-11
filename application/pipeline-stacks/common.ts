@@ -20,6 +20,7 @@ import {createPipelineRoles} from "../base-roles";
 interface IDockerImageBuild extends StackProps {
   env: Environment;
   workflowName: string;
+  gitReference: string;
   dockerTag?: string;
 }
 
@@ -27,6 +28,7 @@ export interface IPipelineStack extends StackProps {
   env: Environment;
   envBuild: Environment;
   workflowName: string;
+  pipelineVersionTag: string;
   dockerTag?: string;
   jobQueuePipelineArn: string;
   jobQueueTaskArns: Map<string, string>;
@@ -47,6 +49,7 @@ export class PipelineStack extends Stack {
     const dockerStack = new DockerImageBuildStack(this, `DockerImageBuildStack-${props.workflowName}`, {
       env: props.envBuild,
       workflowName: props.workflowName,
+      gitReference: props.pipelineVersionTag,
       dockerTag: props.dockerTag,
     });
 
@@ -172,6 +175,7 @@ export class DockerImageBuildStack extends Stack {
     const dockerTag = props.dockerTag || "latest";
 
     const image = new DockerImageAsset(this, `CDKDockerImage-${props.workflowName}`, {
+      buildArgs: { 'PIPELINE_GITHUB_REF': props.gitReference },
       directory: pathjoin(__dirname, props.workflowName),
     });
 

@@ -18,8 +18,6 @@ print_help_text() {
 Usage example: run.sh --subject_id STR --tumor_sample_id STR --tumor_library_id STR --normal_sample_id STR --normal_library_id STR --dragen_somatic_dir DIR --dragen_normal_dir DIR --oncoanalyser_dir DIR
 
 Options:
-  --portal_run_id STR           Portal run ID (out-of-band Portal run ID will be generated if not provided)
-
   --subject_id STR              Subject identifier
 
   --tumor_sample_id STR         Tumor WGS sample id
@@ -32,17 +30,16 @@ Options:
   --dragen_germline_dir DIR     Input DRAGEN germline directory
   --oncoanalyser_dir DIR        Input oncoanalyser directory
 
+  --output_results_dir DIR      Output directory for results
+  --output_staging_dir DIR      Output directory for staging
+  --output_scratch_dir DIR      Output directory for scratch
+
   --resume_nextflow_dir FILE    Previous .nextflow/ directory used to resume a run (S3 URI)
 EOF
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-
-    --portal_run_id)
-      portal_run_id="$2"
-      shift 1
-    ;;
 
     --subject_id)
       subject_id="$2"
@@ -80,6 +77,19 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
+    --output_results_dir)
+      output_results_dir="${2%/}"
+      shift 1
+    ;;
+    --output_staging_dir)
+      output_staging_dir="${2%/}"
+      shift 1
+    ;;
+    --output_scratch_dir)
+      output_scratch_dir="${2%/}"
+      shift 1
+    ;;
+
     --resume_nextflow_dir)
       resume_nextflow_dir="${2%/}"
       shift 1
@@ -101,6 +111,9 @@ normal_library_id
 dragen_somatic_dir
 dragen_germline_dir
 oncoanalyser_dir
+output_results_dir
+output_staging_dir
+output_scratch_dir
 '
 
 missing_args=()
@@ -137,39 +150,11 @@ fi
 
 ## FUNCTIONS ##
 
-get_output_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/sash/${portal_run_id}/${tumor_library_id}_${normal_library_id}"
-}
-
-get_staging_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/sash/${portal_run_id}/staging"
-}
-
-get_scratch_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/sash/${portal_run_id}/scratch"
-}
-
-generate_portal_run_id() {
-  echo $(date '+%Y%m%d')$(openssl rand -hex 4)
-}
-
 get_ssm_parameter_value() {
   aws ssm get-parameter \
     --name "$1" \
     --output json |
   jq --raw-output '.Parameter | .Value'
-}
-
-get_nf_bucket_name_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/sash/nf_bucket_name"
-}
-
-get_nf_bucket_temp_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/sash/nf_bucket_temp_prefix"
-}
-
-get_nf_bucket_output_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/sash/nf_bucket_output_prefix"
 }
 
 get_refdata_basepath() {
@@ -212,7 +197,7 @@ stage_gds_fp() {
   local creds
   local src_fp
 
-  dst_dp_base="$(get_staging_directory)"
+  dst_dp_base="${output_staging_dir#s3://}"
   dst_dp="${dst_dp_base}/${gds_dn%/}"
 
   echo s3://${dst_dp}/
@@ -300,16 +285,10 @@ upload_data() {
     --exclude='software/*' \
     --exclude='assets/*' \
     --exclude='work/*' \
-    ./ "${output_dir}/"
+    ./ "${output_results_dir}/"
 }
 
 ## END FUNCTIONS ##
-
-if [[ -z "${portal_run_id:-}" ]]; then
-  portal_run_id="$(generate_portal_run_id)"
-fi
-
-output_dir="s3://$(get_output_directory)"
 
 ## SET AWS REGION ##
 
@@ -428,11 +407,11 @@ nextflow \
     -ansi-log "false" \
     --monochrome_logs \
     -profile "docker" \
-    -work-dir "s3://$(get_scratch_directory)/" \
+    -work-dir "${output_scratch_dir}/" \
     ${nextflow_args} \
     --input "samplesheet.csv" \
     --ref_data_path "s3://$(get_refdata_basepath)/" \
-    --outdir "${output_dir}/"
+    --outdir "${output_results_dir}/"
 
 # Upload data cleanly
 upload_data

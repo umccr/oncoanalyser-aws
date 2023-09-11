@@ -44,6 +44,13 @@ def main(event, context):
 
     job_data = get_job_data(event)
 
+    output_directory = get_output_results_dir(
+        event['subject_id'],
+        event['tumor_library_id'],
+        event['normal_library_id'],
+        event['portal_run_id'],
+    )
+
     LOGGER.info(f'Compiled job data: {job_data}')
 
     response_job = CLIENT_BATCH.submit_job(
@@ -56,6 +63,12 @@ def main(event, context):
                 {'type': 'MEMORY', 'value': '15000'},
                 {'type': 'VCPU', 'value': '2'},
             ],
+        },
+        parameters={
+            'portal_run_id': event['portal_run_id'],
+            'workflow': 'sash',
+            'version': get_ssm_parameter_value('/nextflow_stack/sash/pipeline_version_tag'),
+            'output': json.dumps({'output_directory': output_directory}),
         },
     )
 
@@ -86,7 +99,34 @@ def get_ssm_parameter_value(name):
     return response['Parameter']['Value']
 
 
+def get_output_results_dir(subject_id, tumor_library_id, normal_library_id, portal_run_id):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/sash/nf_bucket_name')
+    return f's3://{bucket_name}/analysis_data/{subject_id}/sash/{portal_run_id}/{tumor_library_id}_{normal_library_id}'
+
+
+def get_output_scratch_dir(subject_id, portal_run_id):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/sash/nf_bucket_name')
+    return f's3://{bucket_name}/temp_data/{subject_id}/sash/{portal_run_id}/scratch'
+
+
+def get_output_staging_dir(subject_id, portal_run_id):
+
+    bucket_name = get_ssm_parameter_value('/nextflow_stack/sash/nf_bucket_name')
+    return f's3://{bucket_name}/temp_data/{subject_id}/sash/{portal_run_id}/staging'
+
+
 def get_job_command(event):
+
+    output_results_dir = get_output_results_dir(
+        event['subject_id'],
+        event['tumor_library_id'],
+        event['normal_library_id'],
+        event['portal_run_id'],
+    )
+    output_scratch_dir = get_output_scratch_dir(event['subject_id'], event['portal_run_id'])
+    output_staging_dir = get_output_staging_dir(event['subject_id'], event['portal_run_id'])
 
     command_components = [
         './assets/run.sh',
@@ -99,6 +139,9 @@ def get_job_command(event):
         f'--dragen_somatic_dir {event["dragen_somatic_dir"]}',
         f'--dragen_germline_dir {event["dragen_germline_dir"]}',
         f'--oncoanalyser_dir {event["oncoanalyser_dir"]}',
+        f'--output_results_dir {output_results_dir}',
+        f'--output_staging_dir {output_scratch_dir}',
+        f'--output_scratch_dir {output_staging_dir}',
     ]
 
     return ['bash', '-o', 'pipefail', '-c', ' '.join(command_components)]

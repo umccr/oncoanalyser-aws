@@ -19,8 +19,6 @@ Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_sample_id STR --tu
 Options:
   --mode STR                    Mode to run [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
-  --portal_run_id STR           Portal run ID (out-of-band Portal run ID will be generated if not provided)
-
   --subject_id STR              Subject identifier
 
   --tumor_wgs_sample_id STR     Tumor WGS sample identifier
@@ -35,6 +33,10 @@ Options:
   --tumor_wts_library_id STR    Tumor WTS library identifier
   --tumor_wts_bam FILE          Input tumor WTS BAM
 
+  --output_results_dir DIR      Output directory for results
+  --output_staging_dir DIR      Output directory for staging
+  --output_scratch_dir DIR      Output directory for scratch
+
   --existing_wgs_dir DIR        Existing WGS run directory (S3 URI)
   --existing_wts_dir DIR        Existing WGS run directory (S3 URI)
 
@@ -47,11 +49,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --mode)
       mode="$2"
-      shift 1
-    ;;
-
-    --portal_run_id)
-      portal_run_id="$2"
       shift 1
     ;;
 
@@ -99,6 +96,19 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
+    --output_results_dir)
+      output_results_dir="${2%/}"
+      shift 1
+    ;;
+    --output_staging_dir)
+      output_staging_dir="${2%/}"
+      shift 1
+    ;;
+    --output_scratch_dir)
+      output_scratch_dir="${2%/}"
+      shift 1
+    ;;
+
     --existing_wgs_dir)
       existing_wgs_dir="${2%/}"
       shift 1
@@ -133,6 +143,9 @@ fi
 
 required_args='
 subject_id
+output_results_dir
+output_staging_dir
+output_scratch_dir
 '
 
 required_args_wgts='
@@ -220,55 +233,11 @@ fi
 
 ## FUNCTIONS ##
 
-get_output_directory() {
-  local -a sample_ids
-
-  if [[ -n "${tumor_wgs_library_id:-}" ]]; then
-    sample_ids+=(${tumor_wgs_library_id})
-  fi;
-
-  if [[ -n "${normal_wgs_library_id:-}" ]]; then
-    sample_ids+=(${normal_wgs_library_id})
-  fi;
-
-  if [[ -n "${tumor_wts_library_id:-}" ]]; then
-    sample_ids+=(${tumor_wts_library_id})
-  fi;
-
-  sample_ids_str=$(sed 's/ /__/g' <<< ${sample_ids[@]})
-
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/oncoanalyser/${portal_run_id}/${mode}/${sample_ids_str}"
-}
-
-get_staging_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_run_id}/staging"
-}
-
-get_scratch_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/oncoanalyser/${portal_run_id}/scratch"
-}
-
-generate_portal_run_id() {
-  echo $(date '+%Y%m%d')$(openssl rand -hex 4)
-}
-
 get_ssm_parameter_value() {
   aws ssm get-parameter \
     --name "$1" \
     --output json |
   jq --raw-output '.Parameter | .Value'
-}
-
-get_nf_bucket_name_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_name"
-}
-
-get_nf_bucket_temp_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_temp_prefix"
-}
-
-get_nf_bucket_output_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/oncoanalyser/nf_bucket_output_prefix"
 }
 
 get_hmf_refdata_from_ssm() {
@@ -317,7 +286,7 @@ stage_gds_fp() {
   local src_fp
 
 
-  dst_dp="$(get_staging_directory)"
+  dst_dp="${output_staging_dir#s3://}"
   dst_fp="${dst_dp}/${gds_fp##*/}"
 
   echo s3://${dst_fp}
@@ -414,16 +383,10 @@ upload_data() {
     --exclude='software/*' \
     --exclude='assets/*' \
     --exclude='work/*' \
-    ./ "${output_dir}/"
+    ./ "${output_results_dir}/"
 }
 
 ## END FUNCTIONS ##
-
-if [[ -z "${portal_run_id:-}" ]]; then
-  portal_run_id="$(generate_portal_run_id)"
-fi
-
-output_dir="s3://$(get_output_directory)"
 
 ## SET AWS REGION ##
 
@@ -628,7 +591,7 @@ nextflow \
     -ansi-log "false" \
     --monochrome_logs \
     -profile "docker" \
-    -work-dir "s3://$(get_scratch_directory)/" \
+    -work-dir "${output_scratch_dir}/" \
     ${nextflow_args} \
     --input "samplesheet.csv" \
     --genome "GRCh38_umccr" \
@@ -637,7 +600,7 @@ nextflow \
     --force_genome \
     --ref_data_hmf_data_path "s3://$(get_hmf_refdata_from_ssm)/" \
     --ref_data_virusbreakenddb_path "s3://$(get_virusbreakend_db_from_ssm)/" \
-    --outdir "${output_dir}/"
+    --outdir "${output_results_dir}/"
 
 # Upload data cleanly
 upload_data

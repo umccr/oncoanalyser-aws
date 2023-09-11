@@ -1,56 +1,94 @@
-// NOTE(SW): anti-pattern? regardless, taking this further would be to have a class with methods for each setting that
-// returns based on state i.e. uses envName, workflowName, etc passed at init
-export function getSettings(envName: string, workflowName: string) {
+class Shared {
 
-  const nfBucket = envName == "prod" ? "org.umccr.data.oncoanalyser" :  `umccr-temp-${envName}`;
+  constructor(public envName: string, public workflowName: string) {};
 
-  const s3Data = new Map<string, string>([
-    // Shared
-    ["nfBucketName", nfBucket],
-    ["nfPrefixTemp", "temp_data"],
-    ["nfPrefixOutput", "analysis_data"],
-    ["refdataBucketName", `umccr-refdata-${envName}`],
-    ["refdataPrefix", "workflow_data"],
-    // oncoanalyser
-    ["refdataGenomesPath", "genomes"],
-    ["refdataHmfPath", "hmf_reference_data/hmftools/5.33_38--0"],
-    ["refDataVirusbreakendDbPath", "virusbreakend/virusbreakenddb_20210401"],
-    // star-align-nf
-    ["refdataStarIndexPath", "genomes/GRCh38_umccr/star_index/gencode_38/2.7.3a"],
-  ]);
-
-  const refdataBasePath = `${s3Data.get("refdataBucketName")}/${s3Data.get("refdataPrefix")}`;
-
-  const ssmParametersShared = new Map<string, string>([
-    [`/nextflow_stack/${workflowName}/nf_bucket_name`, s3Data.get("nfBucketName")!],
-    [`/nextflow_stack/${workflowName}/nf_bucket_temp_prefix`, s3Data.get("nfPrefixTemp")!],
-    [`/nextflow_stack/${workflowName}/nf_bucket_output_prefix`, s3Data.get("nfPrefixOutput")!],
-  ]);
-
-  let ssmParameters: Map<string, string>;
-  if (workflowName == 'oncoanalyser') {
-    ssmParameters = new Map([
-      ...ssmParametersShared.entries(),
-      [`/nextflow_stack/${workflowName}/refdata_genomes`, `${refdataBasePath}/${s3Data.get("refdataGenomesPath")!}`],
-      [`/nextflow_stack/${workflowName}/refdata_hmf`, `${refdataBasePath}/${s3Data.get("refdataHmfPath")!}`],
-      [`/nextflow_stack/${workflowName}/refdata_virusbreakend`, `${refdataBasePath}/${s3Data.get("refDataVirusbreakendDbPath")!}`],
-    ]);
-  } else if (workflowName == 'star-align-nf') {
-    ssmParameters = new Map([
-      ...ssmParametersShared.entries(),
-      [`/nextflow_stack/${workflowName}/refdata_star_index`, `${refdataBasePath}/${s3Data.get("refdataStarIndexPath")!}`],
-    ]);
-  } else if (workflowName == 'sash') {
-    ssmParameters = new Map([
-      ...ssmParametersShared.entries(),
-      [`/nextflow_stack/${workflowName}/refdata_basepath`, `${refdataBasePath}`],
-    ]);
-  } else {
-    throw new Error('Got bad workflow name');
+  getNfBucket() {
+    return this.envName == "prod" ? "org.umccr.data.oncoanalyser" : `umccr-temp-${this.envName}`;
   }
 
-  return {
-    s3Data: s3Data,
-    ssmParameters: ssmParameters,
+  getRefdataBasePath() {
+    return `${this.getS3Data().get("refdataBucketName")}/${this.getS3Data().get("refdataPrefix")}`;
   }
+
+  getS3Data() {
+    return new Map<string, string>([
+      ["nfBucketName", this.getNfBucket()],
+      ["nfPrefixTemp", "temp_data"],
+      ["nfPrefixOutput", "analysis_data"],
+      ["refdataBucketName", `umccr-refdata-${this.envName}`],
+      ["refdataPrefix", "workflow_data"],
+    ]);
+  }
+
+  getSsmParameters() {
+    return new Map<string, string>([
+      [`/nextflow_stack/${this.workflowName}/nf_bucket_name`, this.getS3Data().get("nfBucketName")!],
+      [`/nextflow_stack/${this.workflowName}/nf_bucket_temp_prefix`, this.getS3Data().get("nfPrefixTemp")!],
+      [`/nextflow_stack/${this.workflowName}/nf_bucket_output_prefix`, this.getS3Data().get("nfPrefixOutput")!],
+    ]);
+  }
+
+}
+
+
+export class StarAlignNf extends Shared {
+
+  readonly versionTag = "v0.1.0"
+
+  getS3Data() {
+    return new Map<string, string>([
+      ...super.getS3Data().entries(),
+      ["refdataStarIndexPath", "genomes/GRCh38_umccr/star_index/gencode_38/2.7.3a"],
+    ]);
+  }
+
+  getSsmParameters() {
+    return new Map<string, string>([
+      ...super.getSsmParameters().entries(),
+      [`/nextflow_stack/${this.workflowName}/refdata_star_index`, `${this.getRefdataBasePath()}/${this.getS3Data().get("refdataStarIndexPath")!}`],
+      [`/nextflow_stack/${this.workflowName}/pipeline_version_tag`, this.versionTag],
+    ]);
+  }
+
+}
+
+
+export class Oncoanalyser extends Shared {
+
+  readonly versionTag = "v0.1.0";
+
+  getS3Data() {
+    return new Map<string, string>([
+      ...super.getS3Data().entries(),
+      ["refdataGenomesPath", "genomes"],
+      ["refdataHmfPath", "hmf_reference_data/hmftools/5.33_38--0"],
+      ["refDataVirusbreakendDbPath", "virusbreakend/virusbreakenddb_20210401"],
+    ]);
+  }
+
+  getSsmParameters() {
+    return new Map<string, string>([
+      ...super.getSsmParameters().entries(),
+      [`/nextflow_stack/${this.workflowName}/refdata_genomes`, `${this.getRefdataBasePath()}/${this.getS3Data().get("refdataGenomesPath")!}`],
+      [`/nextflow_stack/${this.workflowName}/refdata_hmf`, `${this.getRefdataBasePath()}/${this.getS3Data().get("refdataHmfPath")!}`],
+      [`/nextflow_stack/${this.workflowName}/refdata_virusbreakend`, `${this.getRefdataBasePath()}/${this.getS3Data().get("refDataVirusbreakendDbPath")!}`],
+      [`/nextflow_stack/${this.workflowName}/pipeline_version_tag`, this.versionTag],
+    ]);
+  }
+
+}
+
+
+export class Sash extends Shared {
+
+  readonly versionTag = "v0.1.1";
+
+  getSsmParameters() {
+    return new Map<string, string>([
+      ...super.getSsmParameters().entries(),
+      [`/nextflow_stack/${this.workflowName}/refdata_basepath`, `${this.getRefdataBasePath()}`],
+      [`/nextflow_stack/${this.workflowName}/pipeline_version_tag`, this.versionTag],
+    ]);
+  }
+
 }

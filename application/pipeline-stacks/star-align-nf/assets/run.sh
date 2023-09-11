@@ -6,8 +6,6 @@ print_help_text() {
 Usage example: run.sh --subject_id STR --sample_id STR --library_id STR --fastq_fwd FILE --fastq_rev FILE
 
 Options:
-  --portal_run_id STR           Portal run ID (out-of-band Portal run ID will be generated if not provided)
-
   --subject_id STR              Subject identifier
 
   --sample_id STR               Tumor WTS sample identifier
@@ -15,16 +13,15 @@ Options:
 
   --fastq_fwd FILE              Input tumor WTS forward FASTQ
   --fastq_rev FILE              Input tumor WTS reverse FASTQ
+
+  --output_results_dir DIR      Output directory for results
+  --output_staging_dir DIR      Output directory for staging
+  --output_scratch_dir DIR      Output directory for scratch
 EOF
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-
-    --portal_run_id)
-      portal_run_id="$2"
-      shift 1
-    ;;
 
     --subject_id)
       subject_id="$2"
@@ -49,6 +46,19 @@ while [ $# -gt 0 ]; do
       shift 1
     ;;
 
+    --output_results_dir)
+      output_results_dir="${2%/}"
+      shift 1
+    ;;
+    --output_staging_dir)
+      output_staging_dir="${2%/}"
+      shift 1
+    ;;
+    --output_scratch_dir)
+      output_scratch_dir="${2%/}"
+      shift 1
+    ;;
+
     -h|--help)
       print_help_text
       exit 0
@@ -62,6 +72,9 @@ sample_id
 library_id
 fastq_fwd
 fastq_rev
+output_results_dir
+output_staging_dir
+output_scratch_dir
 '
 
 missing_args=()
@@ -92,39 +105,12 @@ if [[ ${#missing_args[@]} -gt 0 ]]; then
 fi
 
 ## SSM Parameter functions
-get_output_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/analysis_data/${subject_id}/star-align-nf/${portal_run_id}/${library_id}"
-}
-
-get_staging_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_run_id}/staging"
-}
-
-get_scratch_directory() {
-  echo "$(get_nf_bucket_name_from_ssm)/temp_data/${subject_id}/star-align-nf/${portal_run_id}/scratch"
-}
-
-generate_portal_run_id() {
-  echo $(date '+%Y%m%d')$(openssl rand -hex 4)
-}
 
 get_ssm_parameter_value(){
   aws ssm get-parameter \
     --name "$1" \
     --output json |
   jq --raw-output '.Parameter | .Value'
-}
-
-get_nf_bucket_name_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_name"
-}
-
-get_nf_bucket_temp_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_temp_prefix"
-}
-
-get_nf_bucket_output_prefix_from_ssm() {
-  get_ssm_parameter_value "/nextflow_stack/star-align-nf/nf_bucket_output_prefix"
 }
 
 get_batch_instance_role_arn_from_ssm(){
@@ -165,7 +151,7 @@ stage_gds_fp() {
   local src_fp
 
 
-  dst_dp="$(get_staging_directory)"
+  dst_dp="${output_staging_dir#s3://}"
   dst_fp="${dst_dp}/${gds_fp##*/}"
 
   echo s3://${dst_fp}
@@ -249,16 +235,10 @@ upload_data() {
     --exclude='software/*' \
     --exclude='assets/*' \
     --exclude='work/*' \
-    ./ "${output_dir}/"
+    ./ "${output_results_dir}/"
 }
 
 ## END FUNCTIONS ##
-
-if [[ -z "${portal_run_id:-}" ]]; then
-  portal_run_id="$(generate_portal_run_id)"
-fi
-
-output_dir="s3://$(get_output_directory)"
 
 ## SET AWS REGION ##
 
@@ -355,11 +335,11 @@ nextflow \
   run software/star-align-nf/main.nf \
     -ansi-log false \
     -profile docker \
-    -work-dir s3://$(get_scratch_directory)/ \
+    -work-dir "${output_scratch_dir}/" \
     --monochrome_logs \
     --input samplesheet.csv \
     --star_index_path s3://$(get_star_index_from_ssm)/ \
-    --outdir ${output_dir}/
+    --outdir ${output_results_dir}/
 
 # Upload data cleanly
 upload_data
