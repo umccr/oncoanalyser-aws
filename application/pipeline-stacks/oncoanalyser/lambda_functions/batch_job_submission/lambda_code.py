@@ -124,6 +124,7 @@ def get_output_scratch_dir(subject_id, portal_run_id):
     bucket_name = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/nf_bucket_name')
     return f's3://{bucket_name}/temp_data/{subject_id}/oncoanalyser/{portal_run_id}/scratch'
 
+
 def get_output_staging_dir(subject_id, portal_run_id):
 
     bucket_name = get_ssm_parameter_value('/nextflow_stack/oncoanalyser/nf_bucket_name')
@@ -147,8 +148,8 @@ def get_job_command(event):
         f'--mode {event["mode"]}',
         f'--subject_id {event["subject_id"]}',
         f'--output_results_dir {output_results_dir}',
-        f'--output_staging_dir {output_scratch_dir}',
-        f'--output_scratch_dir {output_staging_dir}',
+        f'--output_staging_dir {output_staging_dir}',
+        f'--output_scratch_dir {output_scratch_dir}',
     ]
 
     command_components_wgs = [

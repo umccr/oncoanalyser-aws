@@ -140,8 +140,8 @@ def get_job_command(event):
         f'--dragen_germline_dir {event["dragen_germline_dir"]}',
         f'--oncoanalyser_dir {event["oncoanalyser_dir"]}',
         f'--output_results_dir {output_results_dir}',
-        f'--output_staging_dir {output_scratch_dir}',
-        f'--output_scratch_dir {output_staging_dir}',
+        f'--output_staging_dir {output_staging_dir}',
+        f'--output_scratch_dir {output_scratch_dir}',
     ]
 
     return ['bash', '-o', 'pipefail', '-c', ' '.join(command_components)]
