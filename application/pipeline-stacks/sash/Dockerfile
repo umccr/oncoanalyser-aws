@@ -1,7 +1,7 @@
 FROM docker.io/continuumio/miniconda3:22.11.1
 
 # Set nextflow version
-ARG NEXTFLOW_VERSION="23.04.1"
+ARG NEXTFLOW_VERSION="23.04.3"
 ARG NEXTFLOW_PATH="/opt/nextflow"
 
 # Set jq version
