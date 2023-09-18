@@ -1,7 +1,5 @@
 class Shared {
 
-  fusionFs = true;
-
   constructor(public envName: string, public workflowName: string) {};
 
   getNfBucket() {
@@ -84,7 +82,6 @@ export class Oncoanalyser extends Shared {
 export class Sash extends Shared {
 
   readonly versionTag = "v0.1.9";
-  readonly fusionFs = false;
 
   getSsmParameters() {
     return new Map<string, string>([

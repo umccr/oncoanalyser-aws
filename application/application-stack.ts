@@ -69,7 +69,6 @@ export class ApplicationStack extends Stack {
     const pipelineStack = new OncoanalyserStack(this, 'OncoanalyserStack', {
       ...args,
       pipelineVersionTag: stackSettings.versionTag,
-      fusionFs: stackSettings.fusionFs,
       nfBucketName: s3Data.get('nfBucketName')!,
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
@@ -87,7 +86,6 @@ export class ApplicationStack extends Stack {
     const pipelineStack = new StarAlignNfStack(this, 'SashStack', {
       ...args,
       pipelineVersionTag: stackSettings.versionTag,
-      fusionFs: stackSettings.fusionFs,
       nfBucketName: s3Data.get('nfBucketName')!,
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
@@ -105,7 +103,6 @@ export class ApplicationStack extends Stack {
     const pipelineStack = new StarAlignNfStack(this, 'StarAlignNfStack', {
       ...args,
       pipelineVersionTag: stackSettings.versionTag,
-      fusionFs: stackSettings.fusionFs,
       nfBucketName: s3Data.get('nfBucketName')!,
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
