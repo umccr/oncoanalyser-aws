@@ -30,6 +30,7 @@ export interface IPipelineStack extends StackProps {
   workflowName: string;
   pipelineVersionTag: string;
   dockerTag?: string;
+  fusionFs: boolean;
   jobQueuePipelineArn: string;
   jobQueueTaskArns: Map<string, string>;
   nfBucketName: string;
@@ -80,6 +81,44 @@ export class PipelineStack extends Stack {
     refdataBucket.grantRead(stackRoles.pipelineRole, `${props.refdataPrefix}/*`);
 
     // Create job definition for pipeline execution
+    // First, get mount points and volumes for Docker container
+    // NOTE(SW): host Docker socket is always mounted in the container to launch Docker containers for local processes
+    const containerMountPoints = [
+      {
+        sourceVolume: 'docker_socket',
+        containerPath: '/var/run/docker.sock',
+        readOnly: false,
+      },
+    ];
+
+    const containerVolumes = [
+      {
+        name: 'docker_socket',
+        host: { 'sourcePath': '/var/run/docker.sock' }
+      },
+    ];
+
+    // Additionally for local execution, when not using FusionFS we must also
+    // mount the Nextflow workdir with a host path
+    if (!props.fusionFs) {
+
+      containerMountPoints.push(
+        {
+          sourceVolume: 'nextflow_workdir',
+          containerPath: '/root/pipeline/work/',
+          readOnly: false,
+        },
+      );
+
+      containerVolumes.push(
+        {
+          name: 'nextflow_workdir',
+          host: { 'sourcePath': '/root/pipeline/work/' }
+        },
+      );
+
+    }
+
     const pipelineJobDefinition = new JobDefinition(this, `Nextflow-${props.workflowName}`, {
       container: {
         image: dockerStack.image,
@@ -87,21 +126,8 @@ export class PipelineStack extends Stack {
         memoryLimitMiB: 1000,
         vcpus: 1,
         jobRole: stackRoles.pipelineRole,
-        // NOTE(SW): host Docker socket is mounted in the container to launch Docker containers for local processes
-        // NOTE(SW): when not using Fusion we must also mount the Nextflow workdir with a host path
-        mountPoints: [
-          {
-            sourceVolume: 'docker_socket',
-            containerPath: '/var/run/docker.sock',
-            readOnly: false,
-          },
-        ],
-        volumes: [
-          {
-            name: 'docker_socket',
-            host: { 'sourcePath': '/var/run/docker.sock' }
-          },
-        ],
+        mountPoints: containerMountPoints,
+        volumes: containerVolumes,
       },
     });
 
