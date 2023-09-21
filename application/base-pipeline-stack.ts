@@ -41,13 +41,11 @@ const batchComputePipeline: IBatchComputeData = {
   name: 'pipeline',
   costModel: ComputeResourceType.ON_DEMAND,
   instances: [
-   'r5dn.large',
+   'r6i.large',
   ],
 };
 
 const batchComputeTask: IBatchComputeData[] = [
-
-  // TODO(SW): if the on-demand queue is used, restrict to instances with SSD for Fusion
 
   {
     name: 'unrestricted',
@@ -59,31 +57,18 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '2cpu_16gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-     'r5d.large',
-     'r5dn.large',
-     'r6id.large',
+     'r5.large',
+     'r5n.large',
+     'r6i.large',
     ],
   },
-
-  /*
-
-  {
-    name: '4cpu_8gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-     'c5.xlarge',
-     'c6i.xlarge',
-    ],
-  },
-
-  */
 
   {
     name: '4cpu_16gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'm5d.xlarge',
-      'm6id.xlarge',
+      'm5.xlarge',
+      'm6i.xlarge',
     ],
   },
 
@@ -91,9 +76,9 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '4cpu_32gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'r5d.xlarge',
-      'r5dn.xlarge',
-      'r6id.xlarge',
+      'r5.xlarge',
+      'r5n.xlarge',
+      'r6i.xlarge',
     ],
   },
 
@@ -101,8 +86,8 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '8cpu_32gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'm5d.2xlarge',
-      'm6id.2xlarge',
+      'm5.2xlarge',
+      'm6i.2xlarge',
     ],
   },
 
@@ -110,9 +95,9 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '8cpu_64gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'r5d.2xlarge',
-      'r5dn.2xlarge',
-      'r6id.2xlarge',
+      'r5.2xlarge',
+      'r5n.2xlarge',
+      'r6i.2xlarge',
     ],
   },
 
@@ -120,8 +105,8 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '16cpu_32gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'c5d.4xlarge',
-      'c6id.4xlarge',
+      'c5.4xlarge',
+      'c6i.4xlarge',
     ],
     // Allow up to 16 concurrent jobs
     maxvCpus: 256,
@@ -131,8 +116,8 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '16cpu_64gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'm5d.4xlarge',
-      'm6id.4xlarge',
+      'm5.4xlarge',
+      'm6i.4xlarge',
     ],
     // Allow up to 16 concurrent jobs
     maxvCpus: 256,
@@ -142,26 +127,12 @@ const batchComputeTask: IBatchComputeData[] = [
     name: '16cpu_128gb',
     costModel: ComputeResourceType.ON_DEMAND,
     instances: [
-      'r5d.4xlarge',
-      'r6id.4xlarge',
+      'r5.4xlarge',
+      'r6i.4xlarge',
     ],
     // Allow up to 16 concurrent jobs
     maxvCpus: 256,
   },
-
-  /*
-
-  {
-    name: '16cpu_64gb',
-    costModel: ComputeResourceType.SPOT,
-    instances: [
-      'm4.4xlarge',
-      'm5.4xlarge',
-      'm6i.4xlarge',
-    ],
-  },
-
- */
 
 ];
 
@@ -254,32 +225,52 @@ export class BasePipelineStack extends Stack {
 
 
   getLaunchTemplateSpec(args: { namespace: string, volumeSize: number }) {
+
+    // Required packages for Amazon Elastic Block Store Autoscale set in the Cloud Config block
+
+    // NOTE(SW): The AWS CLIv2 install must not clobber Docker paths otherwise the corresponding
+    // paths in the Docker container will be mounted over. The Amazon Elastic Block Store Autoscale
+    // install and daemon also require AWS CLIv2 to be in path, so I symlink it into /usr/local/bin
+
     // NOTE(SW): using UserData.addCommands does not render with a MIME block when passed to the
     // batch-alpha.ComputeEnvironment, which then results in an invalid compute environment
 
-    // NOTE(SW): using 777 mode for Fusion NVMe SSD mount since I'm not certain whether different Docker users will
-    // impact ability to access e.g. Docker containers can run as either be root or mamberuser in oncoanalyser but Batch
-    // might run with elevate privileges
-
-    const userData = UserData.custom(
+    const userDataTask = UserData.custom(
 `MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+Content-Type: multipart/mixed; boundary="==BOUNDARY=="
 
---==MYBOUNDARY==
+--==BOUNDARY==
+Content-Type: text/cloud-config; charset="us-ascii"
+
+packages:
+  - btrfs-progs
+  - git
+  - jq
+  - lvm2
+  - sed
+  - unzip
+  - wget
+
+--==BOUNDARY==
 Content-Type: text/x-shellscript; charset="us-ascii"
 
 #!/bin/bash
-mkdir -p /mnt/local_ephemeral/
-mkfs.ext4 /dev/nvme1n1
-mount /dev/nvme1n1 /mnt/local_ephemeral/
-chmod 777 /mnt/local_ephemeral/
+curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp/
 
---==MYBOUNDARY==--`
+/tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
+ln -s /opt/awscliv2/bin/aws /usr/local/bin/
+
+git clone -b v2.4.7 https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
+bash /tmp/amazon-ebs-autoscale/install.sh --initial-size 20
+
+rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
+--==BOUNDARY==--`
     );
 
     return new LaunchTemplate(this, `${args.namespace}LaunchTemplate`, {
       launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-launch-template`,
-      userData: userData,
+      userData: (args.namespace == 'BaseTask') ? userDataTask : undefined,
     });
   }
 
@@ -356,4 +347,3 @@ chmod 777 /mnt/local_ephemeral/
   return [computeEnvironment, jobQueue];
   }
 }
-
