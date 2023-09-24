@@ -262,7 +262,7 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 ln -s /opt/awscliv2/bin/aws /usr/local/bin/
 
 git clone -b v2.4.7 https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
-bash /tmp/amazon-ebs-autoscale/install.sh --initial-size 20
+bash /tmp/amazon-ebs-autoscale/install.sh
 
 rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
 --==BOUNDARY==--`
