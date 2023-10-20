@@ -27,7 +27,7 @@ def main(event, context):
         "normal_library_id": "L2300002",
         "dragen_somatic_dir": "gds://production/analysis_data/SBJ00001/wgs_tumor_normal/20230515zyxwvuts/L2300001_L2300002/",
         "dragen_germline_dir": "gds://production/analysis_data/SBJ00001/wgs_tumor_normal/20230515zyxwvuts/L2300002_dragen_germline/",
-        "oncoanalyser_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230518poiuytre/wgs/L2300001__L2300002/SBJ00001_PRJ230001/"
+        "oncoanalyser_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230518poiuytre/wgs/L2300001__L2300002/"
     }
 
     :params dict event: Event payload
@@ -128,6 +128,8 @@ def get_job_command(event):
     output_scratch_dir = get_output_scratch_dir(event['subject_id'], event['portal_run_id'])
     output_staging_dir = get_output_staging_dir(event['subject_id'], event['portal_run_id'])
 
+    oncoanalyser_dir = event['oncoanalyser_dir'].rstrip('/') + f'/{event["subject_id"]}_{event["tumor_sample_id"]}/'
+
     command_components = [
         './assets/run.sh',
         f'--subject_id {event["subject_id"]}',
@@ -137,7 +139,7 @@ def get_job_command(event):
         f'--normal_library_id {event["normal_library_id"]}',
         f'--dragen_somatic_dir {event["dragen_somatic_dir"]}',
         f'--dragen_germline_dir {event["dragen_germline_dir"]}',
-        f'--oncoanalyser_dir {event["oncoanalyser_dir"]}',
+        f'--oncoanalyser_dir {oncoanalyser_dir}',
         f'--output_results_dir {output_results_dir}',
         f'--output_staging_dir {output_staging_dir}',
         f'--output_scratch_dir {output_scratch_dir}',

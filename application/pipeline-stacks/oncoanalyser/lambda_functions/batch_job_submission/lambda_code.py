@@ -31,8 +31,8 @@ def main(event, context):
         "normal_wgs_sample_id": "PRJ230003",
         "normal_wgs_library_id": "L2300003",
         "normal_wgs_bam": "gds://production/analysis_data/SBJ00001/wgs_tumor_normal/20230515zyxwvuts/L2300001_L2300002_dragen_somatic/PRJ230003_normal.bam",
-        "existing_wgs_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230515asdfghjk/wgs/L2300001__L2300003/SBJ00001_PRJ230001/",
-        "existing_wts_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230515zzxcvbnm/wts/L2300002/SBJ00001_PRJ230002/",
+        "existing_wgs_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230515asdfghjk/wgs/L2300001__L2300003/",
+        "existing_wts_dir": "s3://org.umccr.data.oncoanalyser/analysis_data/SBJ00001/oncoanalyser/20230515zzxcvbnm/wts/L2300002/",
     }
 
     :params dict event: Event payload
@@ -179,18 +179,26 @@ def get_job_command(event):
         command_components.extend(command_components_wgts)
     elif event["mode"] == 'wgts_existing_wgs':
         command_components.extend(command_components_wgts)
-        command_components.append(f'--existing_wgs_dir {event["existing_wgs_dir"]}')
+        command_components.append(f'--existing_wgs_dir {get_wgs_existing_dir(event)}')
     elif event["mode"] == 'wgts_existing_wts':
         command_components.extend(command_components_wgts)
-        command_components.append(f'--existing_wts_dir {event["existing_wts_dir"]}')
+        command_components.append(f'--existing_wts_dir {get_wts_existing_dir(event)}')
     elif event["mode"] == 'wgts_existing_both':
         command_components.extend(command_components_wgts)
-        command_components.append(f'--existing_wgs_dir {event["existing_wgs_dir"]}')
-        command_components.append(f'--existing_wts_dir {event["existing_wts_dir"]}')
+        command_components.append(f'--existing_wgs_dir {get_wgs_existing_dir(event)}')
+        command_components.append(f'--existing_wts_dir {get_wts_existing_dir(event)}')
     else:
         assert False
 
     return ['bash', '-o', 'pipefail', '-c', ' '.join(command_components)]
+
+
+def get_wgs_existing_dir(event):
+    return event['existing_wgs_dir'].rstrip('/') + f'/{event["subject_id"]}_{event["tumor_wgs_sample_id"]}/'
+
+
+def get_wts_existing_dir(event):
+    return event['existing_wts_dir'].rstrip('/') + f'/{event["subject_id"]}_{event["tumor_wts_sample_id"]}/'
 
 
 def validate_event_data(event):

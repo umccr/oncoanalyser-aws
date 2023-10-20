@@ -65,15 +65,15 @@ while [ $# -gt 0 ]; do
     ;;
 
     --dragen_somatic_dir)
-      dragen_somatic_dir="$2"
+      dragen_somatic_dir="${2%/}"
       shift 1
     ;;
     --dragen_germline_dir)
-      dragen_germline_dir="$2"
+      dragen_germline_dir="${2%/}"
       shift 1
     ;;
     --oncoanalyser_dir)
-      oncoanalyser_dir="$2"
+      oncoanalyser_dir="${2%/}"
       shift 1
     ;;
 
@@ -363,7 +363,7 @@ for fp_name in ${input_file_args}; do
   if [[ ${fp} =~ ^gds://.* ]]; then
     input_fps[${fp_name}]=$(stage_gds_fp "${fp}")
   else
-    input_fps[${fp_name}]=${fp}
+    input_fps[${fp_name}]=${fp%}/
   fi
 done
 
