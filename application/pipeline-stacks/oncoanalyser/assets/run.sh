@@ -119,7 +119,7 @@ while [ $# -gt 0 ]; do
     ;;
 
     --custom_config)
-      custom_config="${2%/}"
+      custom_config="${2}"
       shift 1
     ;;
 
