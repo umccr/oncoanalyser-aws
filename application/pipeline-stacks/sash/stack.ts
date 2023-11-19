@@ -1,14 +1,10 @@
-import {Construct} from 'constructs';
+import { Construct } from 'constructs';
 
-import {Stack} from "aws-cdk-lib";
-
-import {IPipelineStack, PipelineStack} from "../common";
+import * as common from '../common';
 
 
-export class SashStack extends PipelineStack {
-
-  constructor(scope: Construct, id: string, props: IPipelineStack) {
+export class SashStack extends common.PipelineStack {
+  constructor(scope: Construct, id: string, props: common.IPipelineStack) {
     super(scope, id, props);
   }
-
 }

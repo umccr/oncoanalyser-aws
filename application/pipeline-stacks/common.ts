@@ -1,37 +1,37 @@
-import {join as pathjoin} from "path";
+import * as path from 'path';
 
-import {Construct} from 'constructs';
+import { Construct } from 'constructs';
 
-import {Environment, Stack, StackProps} from "aws-cdk-lib";
-import {JobDefinition} from "@aws-cdk/aws-batch-alpha";
-import {DockerImageAsset} from 'aws-cdk-lib/aws-ecr-assets';
-import {Repository} from "aws-cdk-lib/aws-ecr";
-import {EcrImage} from 'aws-cdk-lib/aws-ecs';
-import {PolicyStatement, Policy, ManagedPolicy, ServicePrincipal, Role} from 'aws-cdk-lib/aws-iam'
-import {Code, Function as LambdaFunction, Runtime} from 'aws-cdk-lib/aws-lambda'
-import {Bucket} from "aws-cdk-lib/aws-s3";
-import {StringParameter} from "aws-cdk-lib/aws-ssm";
+import * as batchAlpha from '@aws-cdk/aws-batch-alpha';
+import * as cdk from 'aws-cdk-lib';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as iam from 'aws-cdk-lib/aws-iam'
+import * as lambda from 'aws-cdk-lib/aws-lambda'
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 
-import {ECRDeployment, DockerImageName} from "cdk-ecr-deployment";
+import * as ecrDeployment from 'cdk-ecr-deployment';
 
-import {createPipelineRoles} from "../base-roles";
+import * as baseRoles from '../shared/base-roles';
 
 
-interface IDockerImageBuild extends StackProps {
-  env: Environment;
+interface IDockerImageBuild extends cdk.StackProps {
+  env: cdk.Environment;
   workflowName: string;
   gitReference: string;
   dockerTag?: string;
 }
 
-export interface IPipelineStack extends StackProps {
-  env: Environment;
-  envBuild: Environment;
+export interface IPipelineStack extends cdk.StackProps {
+  env: cdk.Environment;
+  envBuild: cdk.Environment;
   workflowName: string;
   pipelineVersionTag: string;
   dockerTag?: string;
-  jobQueuePipelineArn: string;
-  jobQueueTaskArns: Map<string, string>;
+  jobQueuePipelineArns: string[];
+  jobQueueTaskArns: string[];
   nfBucketName: string;
   nfPrefixTemp: string;
   nfPrefixOutput: string;
@@ -40,8 +40,8 @@ export interface IPipelineStack extends StackProps {
   ssmParameters: Map<string, string>;
 }
 
-export class PipelineStack extends Stack {
 
+export class PipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: IPipelineStack) {
     super(scope, id, props);
 
@@ -54,15 +54,14 @@ export class PipelineStack extends Stack {
     });
 
     // Create roles
-    const jobQueueTaskArnsArray = Array.from(props.jobQueueTaskArns.values());
-    const stackRoles = createPipelineRoles({
+    const stackRoles = baseRoles.createPipelineRoles({
       context: this,
       workflowName: props.workflowName,
-      jobQueueArns: jobQueueTaskArnsArray,
+      jobQueueArns: props.jobQueueTaskArns,
     });
 
     // Bucket permissions
-    const nfBucket = Bucket.fromBucketName(this, `S3Bucket-nfBucket-${props.workflowName}`,
+    const nfBucket = s3.Bucket.fromBucketName(this, `S3Bucket-nfBucket-${props.workflowName}`,
       props.nfBucketName,
     );
 
@@ -72,7 +71,7 @@ export class PipelineStack extends Stack {
     nfBucket.grantReadWrite(stackRoles.taskRole, `${props.nfPrefixOutput}/*/${props.workflowName}/*`);
     nfBucket.grantReadWrite(stackRoles.pipelineRole, `${props.nfPrefixOutput}/*/${props.workflowName}/*`);
 
-    const refdataBucket = Bucket.fromBucketName(this, `S3Bucket-refdataBucket-${props.workflowName}`,
+    const refdataBucket = s3.Bucket.fromBucketName(this, `S3Bucket-refdataBucket-${props.workflowName}`,
       props.refdataBucketName,
     );
 
@@ -80,7 +79,7 @@ export class PipelineStack extends Stack {
     refdataBucket.grantRead(stackRoles.pipelineRole, `${props.refdataPrefix}/*`);
 
     // Create job definition for pipeline execution
-    const pipelineJobDefinition = new JobDefinition(this, `Nextflow-${props.workflowName}`, {
+    const pipelineJobDefinition = new batchAlpha.JobDefinition(this, `Nextflow-${props.workflowName}`, {
       container: {
         image: dockerStack.image,
         command: ['true'],
@@ -105,59 +104,59 @@ export class PipelineStack extends Stack {
     });
 
     // Create Lambda function role
-    const lambdaSubmissionRole = new Role(this, `LambdaSubmitRole-${props.workflowName}`, {
-      assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
+    const lambdaSubmissionRole = new iam.Role(this, `LambdaSubmitRole-${props.workflowName}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
-        ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMReadOnlyAccess'),
-        ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMReadOnlyAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
       ]
     });
-    new Policy(this, `LambdaBatchPolicy-${props.workflowName}`, {
+    new iam.Policy(this, `LambdaBatchPolicy-${props.workflowName}`, {
       roles: [lambdaSubmissionRole],
-      statements: [new PolicyStatement({
+      statements: [new iam.PolicyStatement({
         actions: [
           'batch:SubmitJob',
         ],
         resources: [
-          props.jobQueuePipelineArn,
+          ...props.jobQueuePipelineArns,
           pipelineJobDefinition.jobDefinitionArn,
         ],
       })],
     });
 
     // Create Lambda function
-    const aws_lambda_function = new LambdaFunction(this, `LambdaSubmissionFunction-${props.workflowName}`, {
+    const aws_lambda_function = new lambda.Function(this, `LambdaSubmissionFunction-${props.workflowName}`, {
       functionName: `${props.workflowName}-batch-job-submission`,
       handler: 'lambda_code.main',
-      runtime: Runtime.PYTHON_3_9,
-      code: Code.fromAsset(pathjoin(__dirname, props.workflowName, 'lambda_functions', 'batch_job_submission')),
+      runtime: lambda.Runtime.PYTHON_3_9,
+      code: lambda.Code.fromAsset(path.join(__dirname, props.workflowName, 'lambda_functions', 'batch_job_submission')),
       role: lambdaSubmissionRole
     });
 
     // Create SSM parameters
-    new StringParameter(this, `SsmParameter-batch_job_definition-${props.workflowName}`, {
+    new ssm.StringParameter(this, `SsmParameter-batch_job_definition-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/batch_job_definition_arn`,
       stringValue: pipelineJobDefinition.jobDefinitionArn,
     });
 
-    new StringParameter(this, `SsmParameter-batch_instance_task_role-${props.workflowName}`, {
+    new ssm.StringParameter(this, `SsmParameter-batch_instance_task_role-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/batch_instance_task_role_arn`,
       stringValue: stackRoles.taskRole.roleArn,
     });
 
-    new StringParameter(this, `SsmParameter-batch_instance_task_profile-${props.workflowName}`, {
+    new ssm.StringParameter(this, `SsmParameter-batch_instance_task_profile-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/batch_instance_task_profile_arn`,
       stringValue: stackRoles.taskProfile.attrArn,
     });
 
-    new StringParameter(this, `SsmParameter-submission_lambda-${props.workflowName}`, {
+    new ssm.StringParameter(this, `SsmParameter-submission_lambda-${props.workflowName}`, {
       parameterName: `/nextflow_stack/${props.workflowName}/submission_lambda_arn`,
       stringValue: aws_lambda_function.functionArn,
     });
 
     // Store SSM parameters from settings
     for (let [key, value] of props.ssmParameters) {
-      new StringParameter(this, `SsmParameter-${key.replace(/^.*\//, '')}-${props.workflowName}`, {
+      new ssm.StringParameter(this, `SsmParameter-${key.replace(/^.*\//, '')}-${props.workflowName}`, {
         parameterName: key,
         stringValue: value,
       });
@@ -165,27 +164,28 @@ export class PipelineStack extends Stack {
   }
 }
 
-export class DockerImageBuildStack extends Stack {
-  public readonly image: EcrImage;
+
+export class DockerImageBuildStack extends cdk.Stack {
+  public readonly image: ecs.EcrImage;
 
   constructor(scope: Construct, id: string, props: IDockerImageBuild) {
     super(scope, id, props);
 
-    const dockerTag = props.dockerTag || "latest";
+    const dockerTag = props.dockerTag || 'latest';
 
-    const image = new DockerImageAsset(this, `CDKDockerImage-${props.workflowName}`, {
+    const image = new ecrAssets.DockerImageAsset(this, `CDKDockerImage-${props.workflowName}`, {
       buildArgs: { 'PIPELINE_GITHUB_REF': props.gitReference },
-      directory: pathjoin(__dirname, props.workflowName),
+      directory: path.join(__dirname, props.workflowName),
     });
 
     const dockerDestBase = `${props.env.account}.dkr.ecr.${props.env.region}.amazonaws.com`;
 
-    new ECRDeployment(this, `DeployDockerImage-${props.workflowName}`, {
-      src: new DockerImageName(image.imageUri),
-      dest: new DockerImageName(`${dockerDestBase}/${props.workflowName}:${dockerTag}`),
+    new ecrDeployment.ECRDeployment(this, `DeployDockerImage-${props.workflowName}`, {
+      src: new ecrDeployment.DockerImageName(image.imageUri),
+      dest: new ecrDeployment.DockerImageName(`${dockerDestBase}/${props.workflowName}:${dockerTag}`),
     });
 
-    const ecrRepository = Repository.fromRepositoryName(this, `EcrRespository-${props.workflowName}`, props.workflowName);
-    this.image = EcrImage.fromEcrRepository(ecrRepository, dockerTag);
+    const ecrRepository = ecr.Repository.fromRepositoryName(this, `EcrRespository-${props.workflowName}`, props.workflowName);
+    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, dockerTag);
   }
 }

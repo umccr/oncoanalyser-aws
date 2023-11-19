@@ -1,232 +1,169 @@
-import {Construct} from 'constructs';
+import { Construct } from 'constructs';
 
-import {Stack, StackProps} from "aws-cdk-lib";
-import {
-  AllocationStrategy,
-  ComputeEnvironment,
-  ComputeResourceType,
-  JobQueue,
-  LaunchTemplateSpecification,
-} from "@aws-cdk/aws-batch-alpha";
-import {
-  ISecurityGroup,
-  IVpc,
-  InstanceType,
-  LaunchTemplate,
-  SecurityGroup,
-  SubnetType,
-  UserData,
-  Vpc,
-} from "aws-cdk-lib/aws-ec2";
-import {EcsOptimizedImage} from "aws-cdk-lib/aws-ecs";
-import {
-  CfnInstanceProfile,
-  ManagedPolicy,
-  Role,
-  ServicePrincipal,
-} from "aws-cdk-lib/aws-iam";
+import * as fs from 'fs';
+import * as path from 'path';
 
-import {getBaseBatchInstancePipelineRole, getRoleBatchInstanceTask} from "./base-roles";
+import * as batchAlpha from '@aws-cdk/aws-batch-alpha';
+import * as cdk from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as ecs  from 'aws-cdk-lib/aws-ecs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+
+import * as baseRoles from './shared/base-roles';
+import * as batchQueues from './shared/batch-queues';
+import * as constants from './constants';
+import * as settings from './settings';
 
 
-interface IBatchComputeData {
-  name: string;
-  costModel: ComputeResourceType;
-  instances: string[];
-  maxvCpus?: number;
-}
+export class BasePipelineStack extends cdk.Stack {
+  public readonly jobQueuePipelineArns: string[] = [];
+  public readonly jobQueueTaskArns: string[] = [];
 
-// NOTE(SW): allowing only exactly one pipeline queue/env for now
-const batchComputePipeline: IBatchComputeData = {
-  name: 'pipeline',
-  costModel: ComputeResourceType.ON_DEMAND,
-  instances: [
-   'r6i.large',
-  ],
-};
-
-const batchComputeTask: IBatchComputeData[] = [
-
-  {
-    name: 'unrestricted',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: ['optimal'],
-  },
-
-  {
-    name: '2cpu_16gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-     'r5.large',
-     'r5n.large',
-     'r6i.large',
-    ],
-  },
-
-  {
-    name: '4cpu_16gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'm5.xlarge',
-      'm6i.xlarge',
-    ],
-  },
-
-  {
-    name: '4cpu_32gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'r5.xlarge',
-      'r5n.xlarge',
-      'r6i.xlarge',
-    ],
-  },
-
-  {
-    name: '8cpu_32gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'm5.2xlarge',
-      'm6i.2xlarge',
-    ],
-  },
-
-  {
-    name: '8cpu_64gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'r5.2xlarge',
-      'r5n.2xlarge',
-      'r6i.2xlarge',
-    ],
-  },
-
-  {
-    name: '16cpu_32gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'c5.4xlarge',
-      'c6i.4xlarge',
-    ],
-    // Allow up to 16 concurrent jobs
-    maxvCpus: 256,
-  },
-
-  {
-    name: '16cpu_64gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'm5.4xlarge',
-      'm6i.4xlarge',
-    ],
-    // Allow up to 16 concurrent jobs
-    maxvCpus: 256,
-  },
-
-  {
-    name: '16cpu_128gb',
-    costModel: ComputeResourceType.ON_DEMAND,
-    instances: [
-      'r5.4xlarge',
-      'r6i.4xlarge',
-    ],
-    // Allow up to 16 concurrent jobs
-    maxvCpus: 256,
-  },
-
-];
-
-
-export class BasePipelineStack extends Stack {
-  public readonly jobQueuePipelineArn: string;
-  public readonly jobQueueTaskArns: Map<string, string> = new Map();
-
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-
-    // General resources
-    const vpc = Vpc.fromLookup(this, 'MainVPC', {
+    // Collect existing misc general resource
+    const vpc = ec2.Vpc.fromLookup(this, 'MainVPC', {
       vpcName: 'main-vpc',
     });
 
-    const securityGroup = SecurityGroup.fromLookupByName(
+    const securityGroup = ec2.SecurityGroup.fromLookupByName(
       this,
       'SecurityGroupOutBoundOnly',
       'main-vpc-sg-outbound',
       vpc,
     );
 
+    // Create resources, store job queue ARNs for reference in other constructs
+    this.createTaskResources({
+        queueTypes: settings.taskQueueTypes,
+        storageTypes: settings.taskInstanceStorageTypes,
+        vpc: vpc,
+        securityGroup: securityGroup,
+    });
 
-    // Task Batch compute environment and job queue
-    const launchTemplateTask = this.getLaunchTemplateSpec({ namespace: 'BaseTask', volumeSize: 500 });
+    this.createPipelineResources({
+        storageTypes: settings.taskInstanceStorageTypes,
+        vpc: vpc,
+        securityGroup: securityGroup,
+    });
 
+  }
+
+  createTaskResources(args: {
+    queueTypes: constants.QueueType[],
+    storageTypes: constants.InstanceStorageType[],
+    vpc: ec2.IVpc,
+    securityGroup: ec2.ISecurityGroup,
+  }) {
     // NOTE(SW): default job role and should be overridden by a custom job role defined in an individual stack
-    const roleBatchInstanceTask = getRoleBatchInstanceTask({
+    const roleBatchInstanceTask = baseRoles.getRoleBatchInstanceTask({
       context: this,
       workflowName: 'base',
     });
-    const profileBatchInstanceTask = new CfnInstanceProfile(this, 'BaseTaskBatchInstanceProfile', {
+
+    const profileBatchInstanceTask = new iam.CfnInstanceProfile(this, 'BaseTaskBatchInstanceProfile', {
       roles: [roleBatchInstanceTask.roleName],
     });
 
-    // NOTE(SW): only required when using SPOT compute environment type, leaving here regardless
-    const roleBatchSpotfleetTask = new Role(this, 'BaseTaskBatchSpotFleetRole', {
-      assumedBy: new ServicePrincipal('spotfleet.amazonaws.com'),
-      managedPolicies: [
-        ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2SpotFleetTaggingRole'),
-      ],
-    });
+    let roleBatchSpotfleetTask;
+    if (args.queueTypes.includes(constants.QueueType.Spot)) {
 
-    let jobQueueTaskArns: Map<string, string> = new Map();
-    for (let batchComputeData of batchComputeTask) {
-      let [computeEnvironment, jobQueue] = this.getComputeEnvironment({
-        batchComputeData: batchComputeData,
-        vpc: vpc,
-        profileBatchInstance: profileBatchInstanceTask,
-        launchTemplate: launchTemplateTask,
-        securityGroup: securityGroup,
-        roleBatchSpotfleet: roleBatchSpotfleetTask,
-        serviceType: 'Task',
+      roleBatchSpotfleetTask = new iam.Role(this, 'BaseTaskBatchSpotFleetRole', {
+        assumedBy: new iam.ServicePrincipal('spotfleet.amazonaws.com'),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2SpotFleetTaggingRole'),
+        ],
       });
 
-      if (this.jobQueueTaskArns.has(batchComputeData.name)) {
-        throw new Error('Got duplicate instance categories');
-      } else {
-        this.jobQueueTaskArns.set(batchComputeData.name, jobQueue.jobQueueArn);
-      }
     }
 
+    for (let storageType of args.storageTypes) {
+      const launchTemplateTask = this.getLaunchTemplateSpec({
+        namespace: 'BaseTask',
+        storageType: storageType,
+      });
 
-    // Pipeline Batch compute environment and job queue
-    const launchTemplatePipeline = this.getLaunchTemplateSpec({ namespace: 'BasePipeline', volumeSize: 50 });
+      for (let queueType of args.queueTypes) {
 
-    const jobQueueTaskArnsArray = Array.from(this.jobQueueTaskArns.values());
-    const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole({
-      context: this,
-      workflowName: 'base',
-      jobQueueArns: jobQueueTaskArnsArray,
-    });
-    const profileBatchInstancePipeline = new CfnInstanceProfile(this, 'BasePipelineBatchInstanceProfile', {
-      roles: [roleBatchInstancePipeline.roleName],
-    });
+        let jobQueueTaskArns: Map<string, string> = new Map();
 
-    const [computeEnvironmentPipeline, jobQueuePipeline] = this.getComputeEnvironment({
-      batchComputeData: batchComputePipeline,
-      vpc: vpc,
-      profileBatchInstance: profileBatchInstancePipeline,
-      launchTemplate: launchTemplatePipeline,
-      securityGroup: securityGroup,
-      serviceType: 'Pipeline',
-    });
+        for (let taskQueueData of batchQueues.taskQueues) {
 
-    this.jobQueuePipelineArn = jobQueuePipeline.jobQueueArn;
+          let [computeEnvironment, jobQueue] = this.getComputeEnvironment({
+            queueData: taskQueueData,
+            queueType: queueType,
+            storageType: storageType,
+            vpc: args.vpc,
+            securityGroup: args.securityGroup,
+            launchTemplate: launchTemplateTask,
+            profileBatchInstance: profileBatchInstanceTask,
+            roleBatchSpotfleet: roleBatchSpotfleetTask,
+            serviceType: constants.ServiceType.Task,
+          });
+
+          this.jobQueueTaskArns.push(jobQueue.jobQueueArn);
+        }
+      }
+    }
   }
 
+  createPipelineResources(args: {
+    storageTypes: constants.InstanceStorageType[],
+    vpc: ec2.IVpc,
+    securityGroup: ec2.ISecurityGroup,
+  }) {
+    // NOTE(SW): default job role and should be overridden by a custom job role defined in an individual stack
+    const roleBatchInstance = baseRoles.getBaseBatchInstancePipelineRole({
+      context: this,
+      workflowName: 'base',
+      jobQueueArns: Array.from(this.jobQueueTaskArns.values()),
+    });
 
-  getLaunchTemplateSpec(args: { namespace: string, volumeSize: number }) {
+    const profileBatchInstance = new iam.CfnInstanceProfile(this, 'BasePipelineBatchInstanceProfile', {
+      roles: [roleBatchInstance.roleName],
+    });
 
-    // Required packages for Amazon Elastic Block Store Autoscale set in the Cloud Config block
+
+    // NOTE(SW): here we make a special case for the pipeline queue in the UMCCR environment. This exception is designed
+    // to met existing compatibility requirements for the external orchestrator service (single queue, constant queue
+    // name) while allowing runs with and without FusionFS. This is done by:
+    //   (1) creating a single pipeline queue with a predefined constant name
+    //   (2) forcing the pipeline queue storage type to 'NvmeSsdOnly' for FusionFS compatibility
+    //
+    // One side-effect of this is that pipelines not using FusionFS will still be run on instance with NVMe SSD but
+    // won't utilise that resource.
+    const queueName = constants.PIPELINE_BATCH_QUEUE_BASENAME;
+    const storageType = constants.InstanceStorageType.NvmeSsdOnly;
+
+
+    const launchTemplate = this.getLaunchTemplateSpec({
+      namespace: 'BasePipeline',
+      storageType: storageType,
+    });
+
+    const [computeEnvironment, jobQueue] = this.getComputeEnvironment({
+      queueData: batchQueues.pipelineQueue,
+      queueType: constants.QueueType.Ondemand,
+      storageType: storageType,
+      vpc: args.vpc,
+      securityGroup: args.securityGroup,
+      launchTemplate: launchTemplate,
+      profileBatchInstance: profileBatchInstance,
+      serviceType: constants.ServiceType.Pipeline,
+      queueName: queueName,
+    });
+
+    this.jobQueuePipelineArns.push(jobQueue.jobQueueArn);
+  }
+
+  getLaunchTemplateSpec(args: {
+    namespace: string,
+    storageType: constants.InstanceStorageType,
+  }) {
+
+    // NOTE(SW): EBS user data installs required packages for Amazon Elastic Block Store Autoscale
+    // set in the Cloud Config block
 
     // NOTE(SW): The AWS CLIv2 install must not clobber Docker paths otherwise the corresponding
     // paths in the Docker container will be mounted over. The Amazon Elastic Block Store Autoscale
@@ -235,115 +172,133 @@ export class BasePipelineStack extends Stack {
     // NOTE(SW): using UserData.addCommands does not render with a MIME block when passed to the
     // batch-alpha.ComputeEnvironment, which then results in an invalid compute environment
 
-    const userDataTask = UserData.custom(
-`MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+    let userDataFn: string;
+    switch(args.storageType) {
+      case(constants.InstanceStorageType.EbsOnly):
+        userDataFn = 'ebs.txt';
+        break;
+      case(constants.InstanceStorageType.NvmeSsdOnly):
+        userDataFn = 'nvme.txt';
+        break;
+      default:
+        throw new Error('Got bad storage type');
+    }
 
---==BOUNDARY==
-Content-Type: text/cloud-config; charset="us-ascii"
+    const userDataFp: string = path.join(__dirname, 'resources/launch_templates/', userDataFn);
 
-packages:
-  - btrfs-progs
-  - git
-  - jq
-  - lvm2
-  - sed
-  - unzip
-  - wget
+    const userDataString = fs.readFileSync(userDataFp, {encoding: 'utf-8'});
+    const userDataTask = ec2.UserData.custom(userDataString);
 
---==BOUNDARY==
-Content-Type: text/x-shellscript; charset="us-ascii"
-
-#!/bin/bash
-curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp/
-
-/tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
-ln -s /opt/awscliv2/bin/aws /usr/local/bin/
-
-git clone -b v2.4.7 https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
-bash /tmp/amazon-ebs-autoscale/install.sh
-
-rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
---==BOUNDARY==--`
-    );
-
-    return new LaunchTemplate(this, `${args.namespace}LaunchTemplate`, {
-      launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-launch-template`,
+    const launchTemplate = new ec2.LaunchTemplate(this, `${args.namespace}LaunchTemplate-${args.storageType.toLowerCase()}`, {
+      launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-${args.storageType.toLowerCase()}-launch-template`,
       userData: (args.namespace == 'BaseTask') ? userDataTask : undefined,
     });
+
+    let instanceName: string;
+    if (args.namespace == 'BaseTask') {
+      instanceName = 'nextflow-task';
+    } else if (args.namespace == 'BasePipeline') {
+      instanceName = 'nextflow-pipeline';
+    } else {
+      throw new Error('Got bad namespace');
+    }
+    cdk.Tags.of(launchTemplate).add('Name', instanceName);
+
+    return launchTemplate;
   }
 
   getComputeEnvironment(args: {
-    batchComputeData: IBatchComputeData,
-    vpc: IVpc,
-    profileBatchInstance: CfnInstanceProfile,
-    launchTemplate: LaunchTemplateSpecification,
-    securityGroup: ISecurityGroup,
-    roleBatchSpotfleet?: Role,
-    serviceType: string,
-  }): [ComputeEnvironment, JobQueue] {
-    const categoryName = args.batchComputeData.name;
-    const instanceTypes = args.batchComputeData.instances.map((name) => {
-      return new InstanceType(name);
-    });
+    queueData: batchQueues.IQueueData,
+    queueType: constants.QueueType,
+    storageType: constants.InstanceStorageType,
+    vpc: ec2.IVpc,
+    securityGroup: ec2.ISecurityGroup,
+    launchTemplate: batchAlpha.LaunchTemplateSpecification,
+    profileBatchInstance: iam.CfnInstanceProfile,
+    roleBatchSpotfleet?: iam.Role,
+    serviceType: constants.ServiceType,
+    queueName?: string,
+  }): [batchAlpha.ComputeEnvironment, batchAlpha.JobQueue] {
 
+    let queueDataInstanceTypeKey: string;
+    switch (args.storageType) {
+      case constants.InstanceStorageType.EbsOnly:
+        queueDataInstanceTypeKey = 'standard';
+        break;
+      case constants.InstanceStorageType.NvmeSsdOnly:
+        queueDataInstanceTypeKey = 'nvme_ssd';
+        break;
+      default:
+        throw new Error('Got bad storage type');
+    }
+
+    if (!args.queueData.instances.has(queueDataInstanceTypeKey)) {
+      throw new Error(`Got bad instance type key, "${queueDataInstanceTypeKey}"`);
+    }
+
+    const instanceTypes = args.queueData.instances.get(queueDataInstanceTypeKey)!
+      .map((typeStr) => {
+        return new ec2.InstanceType(typeStr);
+      });
+
+    let resourceType;
     let allocationStrategy;
-    switch (args.batchComputeData.costModel) {
-      case ComputeResourceType.ON_DEMAND:
-        allocationStrategy = AllocationStrategy.BEST_FIT;
+    switch (args.queueType) {
+      case constants.QueueType.Ondemand:
+        resourceType = batchAlpha.ComputeResourceType.ON_DEMAND;
+        allocationStrategy = batchAlpha.AllocationStrategy.BEST_FIT;
         break;
-      case ComputeResourceType.SPOT:
-        allocationStrategy = AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
-        break;
-      default:
-        throw new Error('Got bad allocation strategy');
-    }
-
-    let cname;
-    switch (args.serviceType) {
-      case ('Task'):
-        cname = `task-${categoryName}`;
-        break;
-      case ('Pipeline'):
-        cname = categoryName;
+      case constants.QueueType.Spot:
+        resourceType = batchAlpha.ComputeResourceType.SPOT;
+        allocationStrategy = batchAlpha.AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
         break;
       default:
-        throw new Error('Got bad serviceType');
+        throw new Error('Got bad queue type');
     }
 
-    const computeEnvId = `Base{args.serviceType}${categoryName}ComputeEnvironment`;
-    const computeEnvironment = new ComputeEnvironment(this, computeEnvId, {
+    let queueName: string;
+    if (args.queueName) {
+      queueName = args.queueName;
+    } else {
+      queueName = batchQueues.getQueueName({
+        queueBaseName: args.queueData.name,
+        queueType: args.queueType,
+        storageType: args.storageType,
+        serviceType: args.serviceType,
+      });
+    }
+
+    const computeEnvId = `BaseComputeEnvironment-${queueName}`;
+    const computeEnvironment = new batchAlpha.ComputeEnvironment(this, computeEnvId, {
       computeResources: {
         vpc: args.vpc,
         allocationStrategy: allocationStrategy,
         desiredvCpus: 0,
-        image: EcsOptimizedImage.amazonLinux2(),
+        image: ecs.EcsOptimizedImage.amazonLinux2(),
         instanceRole: args.profileBatchInstance.attrArn,
         instanceTypes: instanceTypes,
         launchTemplate: {
           launchTemplateId: args.launchTemplate.launchTemplateId as string,
           version: '$Latest',
         },
-        maxvCpus: args.batchComputeData.maxvCpus ?? 128,
+        maxvCpus: args.queueData.maxvCpus ?? settings.maxvCpusDefault,
         securityGroups: [args.securityGroup],
         spotFleetRole: args.roleBatchSpotfleet,
         vpcSubnets: {
-          subnetType: SubnetType.PUBLIC,
+          subnetType: ec2.SubnetType.PUBLIC,
         },
-        type: args.batchComputeData.costModel,
+        type: resourceType,
       },
     });
 
-
-    const jobQueueId = `Base{args.serviceType}${categoryName}JobQueue`;
-    const jobQueue = new JobQueue(this, jobQueueId, {
-      jobQueueName: `nextflow-${cname}`,
+    const jobQueueId = `BaseJobQueue-${queueName}`;
+    const jobQueue = new batchAlpha.JobQueue(this, jobQueueId, {
+      jobQueueName: `nextflow-${queueName}`,
       computeEnvironments: [
         { computeEnvironment: computeEnvironment, order: 1 },
       ],
     });
 
-  return [computeEnvironment, jobQueue];
+    return [computeEnvironment, jobQueue];
   }
 }

@@ -367,12 +367,12 @@ EOF
 }
 
 samplesheet_wgs_entries() {
-  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bam,${input_fps['tumor_wgs_bam']}"
-  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bam,${input_fps['normal_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bam,${input_fps['tumor_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bam,${input_fps['normal_wgs_bam']}"
 }
 
 samplesheet_wts_entries() {
-  echo "${subject_id}_${1},${subject_id},${tumor_wts_sample_id},tumor,wts,bam,${input_fps['tumor_wts_bam']}"
+  echo "${subject_id}_${1},${subject_id},${tumor_wts_sample_id},tumor,rna,bam,${input_fps['tumor_wts_bam']}"
 }
 
 # Final upload data function
@@ -467,7 +467,7 @@ done
 
 
 cat <<EOF > samplesheet.csv
-id,subject_name,sample_name,sample_type,sequence_type,filetype,filepath
+group_id,subject_id,sample_id,sample_type,sequence_type,filetype,filepath
 EOF
 
 if [[ ${mode} == 'wgs' ]]; then
@@ -494,7 +494,7 @@ elif [[ ${mode} == 'wgts_existing_wts' ]]; then
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,rna,isofox_dir,${existing_wts_dir}/isofox/
 EOF
 
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
@@ -502,19 +502,19 @@ elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_dir,${existing_wgs_dir}/sage/somatic/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,sage_dir,${existing_wgs_dir}/sage/germline/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,chord_dir,${existing_wgs_dir}/chord/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sage_dir,${existing_wgs_dir}/sage/somatic/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,sage_dir,${existing_wgs_dir}/sage/germline/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,dna,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,chord_dir,${existing_wgs_dir}/chord/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sigs_dir,${existing_wgs_dir}/sigs/
 EOF
 
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
@@ -522,20 +522,20 @@ elif [[ ${mode} == 'wgts_existing_both' ]]; then
   cat <<EOF >> samplesheet.csv
 $(samplesheet_wgs_entries)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sage_dir,${existing_wgs_dir}/sage/somatic/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,sage_dir,${existing_wgs_dir}/sage/germline/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,wgs,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,wgs,purple_dir,${existing_wgs_dir}/purple/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,chord_dir,${existing_wgs_dir}/chord/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,wgs,sigs_dir,${existing_wgs_dir}/sigs/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,wts,isofox_dir,${existing_wts_dir}/isofox/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,flagstat,${existing_wgs_dir}/flagstats/${tumor_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,flagstat,${existing_wgs_dir}/flagstats/${normal_wgs_sample_id}.flagstat
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sage_dir,${existing_wgs_dir}/sage/somatic/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,sage_dir,${existing_wgs_dir}/sage/germline/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,dna,purple_dir,${existing_wgs_dir}/purple/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,chord_dir,${existing_wgs_dir}/chord/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sigs_dir,${existing_wgs_dir}/sigs/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,rna,isofox_dir,${existing_wts_dir}/isofox/
 EOF
 
 fi
@@ -546,18 +546,14 @@ fi
 
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
-if [[ ${mode} == 'wgs' ]]; then
-  nextflow_args='--run_mode wgs --run_type tumor_normal'
-elif [[ ${mode} == 'wts' ]]; then
-  nextflow_args='--run_mode wts'
-elif [[ ${mode} == 'wgts' ]]; then
-  nextflow_args='--run_mode wgts --run_type tumor_normal'
+if [[ "${mode}" =~ w(g|t|gt)s ]]; then
+  nextflow_args='--mode wgts'
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
-  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_exclude isofox'
+  nextflow_args='--mode wgts --processes_exclude isofox'
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
-  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_manual --processes_include isofox,lilac,cuppa,orange'
+  nextflow_args='--mode wgts --processes_manual --processes_include isofox,lilac,cuppa,orange'
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
-  nextflow_args='--run_mode wgts --run_type tumor_normal --processes_manual --processes_include lilac,cuppa,orange'
+  nextflow_args='--mode wgts --processes_manual --processes_include lilac,cuppa,orange'
 fi
 
 if [[ -n "${resume_nextflow_dir:-}" ]]; then

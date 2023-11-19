@@ -1,27 +1,19 @@
-import {Stack} from 'aws-cdk-lib'
-import {
-  CfnInstanceProfile,
-  CompositePrincipal,
-  IRole,
-  ManagedPolicy,
-  Policy,
-  PolicyStatement,
-  Role,
-  ServicePrincipal,
-} from 'aws-cdk-lib/aws-iam'
-import {Secret} from "aws-cdk-lib/aws-secretsmanager";
+import * as cdk from 'aws-cdk-lib';
+
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 
-export function createPipelineRoles(args: { context: Stack, workflowName: string, jobQueueArns: string[] }) {
+export function createPipelineRoles(args: { context: cdk.Stack, workflowName: string, jobQueueArns: string[] }) {
     // Task and pipeline role
     const roleBatchInstanceTask = getRoleBatchInstanceTask(args);
     const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole(args);
 
     // Profiles
-    const profileBatchInstanceTask = new CfnInstanceProfile(args.context, `TaskBatchInstanceProfile-${args.workflowName}`, {
+    const profileBatchInstanceTask = new iam.CfnInstanceProfile(args.context, `TaskBatchInstanceProfile-${args.workflowName}`, {
       roles: [roleBatchInstanceTask.roleName],
     });
-    const profileBatchInstancePipeline = new CfnInstanceProfile(args.context, `PipelineBatchInstanceProfile-${args.workflowName}`, {
+    const profileBatchInstancePipeline = new iam.CfnInstanceProfile(args.context, `PipelineBatchInstanceProfile-${args.workflowName}`, {
       roles: [roleBatchInstancePipeline.roleName],
     });
 
@@ -38,9 +30,9 @@ export function createPipelineRoles(args: { context: Stack, workflowName: string
     //      - required staging data from GDS
     //
     roleBatchInstancePipeline.attachInlinePolicy(
-      new Policy(args.context, `PipelinePolicyPassRole-${args.workflowName}`, {
+      new iam.Policy(args.context, `PipelinePolicyPassRole-${args.workflowName}`, {
         statements: [
-          new PolicyStatement({
+          new iam.PolicyStatement({
             actions: ['iam:PassRole'],
             resources: [roleBatchInstanceTask.roleArn],
           })
@@ -49,9 +41,9 @@ export function createPipelineRoles(args: { context: Stack, workflowName: string
     );
 
     roleBatchInstancePipeline.attachInlinePolicy(
-      new Policy(args.context, `PipelinePolicySetInstanceRole-${args.workflowName}`, {
+      new iam.Policy(args.context, `PipelinePolicySetInstanceRole-${args.workflowName}`, {
         statements: [
-          new PolicyStatement({
+          new iam.PolicyStatement({
             actions: [
               'ec2:DescribeIamInstanceProfileAssociations',
               // NOTE(SW): this /only/ allows passing the task role that is defined above
@@ -63,7 +55,7 @@ export function createPipelineRoles(args: { context: Stack, workflowName: string
       })
     );
 
-    const icaSecret = Secret.fromSecretNameV2(args.context, `IcaSecret-${args.workflowName}`, "IcaSecretsPortal");
+    const icaSecret = secretsmanager.Secret.fromSecretNameV2(args.context, `IcaSecret-${args.workflowName}`, 'IcaSecretsPortal');
     icaSecret.grantRead(roleBatchInstancePipeline);
 
     return {
@@ -74,25 +66,26 @@ export function createPipelineRoles(args: { context: Stack, workflowName: string
     }
 }
 
-export function getRoleBatchInstanceTask(args: { context: Stack, workflowName: string }) {
-  const roleTask = new Role(args.context, `TaskBatchInstanceRole-${args.workflowName}`, {
-    assumedBy: new CompositePrincipal(
-      new ServicePrincipal('ec2.amazonaws.com'),
-      new ServicePrincipal('ecs-tasks.amazonaws.com'),
+
+export function getRoleBatchInstanceTask(args: { context: cdk.Stack, workflowName: string }) {
+  const roleTask = new iam.Role(args.context, `TaskBatchInstanceRole-${args.workflowName}`, {
+    assumedBy: new iam.CompositePrincipal(
+      new iam.ServicePrincipal('ec2.amazonaws.com'),
+      new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     ),
     managedPolicies: [
-      ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
-      ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
-      ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
     ],
   });
 
   // TODO(SW): restrict instances this applies to using a condition with some stack-specific value
   // such as instance name (NextflowApplication*), instance profile (defined in stack) or some
   // other tag. Some condition keys: ec2:Attribute/${n}, ec2:ResourceTag/${n}, ec2:InstanceProfile
-  new Policy(args.context, `TaskPolicyEbsAutoScale-${args.workflowName}`, {
+  new iam.Policy(args.context, `TaskPolicyEbsAutoScale-${args.workflowName}`, {
     roles: [roleTask],
-    statements: [new PolicyStatement({
+    statements: [new iam.PolicyStatement({
       actions: [
         'ec2:AttachVolume',
         'ec2:CreateTags',
@@ -111,26 +104,27 @@ export function getRoleBatchInstanceTask(args: { context: Stack, workflowName: s
   return roleTask;
 }
 
-export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflowName: string, jobQueueArns: string[] }) {
 
-  const rolePipeline = new Role(args.context, `PipelineBatchInstanceRole-${args.workflowName}`, {
-    assumedBy: new CompositePrincipal(
-      new ServicePrincipal('ec2.amazonaws.com'),
-      new ServicePrincipal('ecs-tasks.amazonaws.com'),
+export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, workflowName: string, jobQueueArns: string[] }) {
+
+  const rolePipeline = new iam.Role(args.context, `PipelineBatchInstanceRole-${args.workflowName}`, {
+    assumedBy: new iam.CompositePrincipal(
+      new iam.ServicePrincipal('ec2.amazonaws.com'),
+      new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     ),
     managedPolicies: [
-      ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
-      ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
-      ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
     ],
   });
 
   // NOTE(SW): the below policies are mostly those described by the Nextflow documents, some minor changes have been
   // made so that the access is less permissive
 
-  new Policy(args.context, `PipelinePolicyBatchJobs-${args.workflowName}`, {
+  new iam.Policy(args.context, `PipelinePolicyBatchJobs-${args.workflowName}`, {
     roles: [rolePipeline],
-    statements: [new PolicyStatement({
+    statements: [new iam.PolicyStatement({
       actions: [
         'batch:CancelJob',
         'batch:SubmitJob',
@@ -145,9 +139,9 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflo
     })],
   });
 
-  new Policy(args.context, `PipelinePolicyBatchGeneral-${args.workflowName}`, {
+  new iam.Policy(args.context, `PipelinePolicyBatchGeneral-${args.workflowName}`, {
     roles: [rolePipeline],
-    statements: [new PolicyStatement({
+    statements: [new iam.PolicyStatement({
       actions: [
         'batch:ListJobs',
         'batch:DescribeJobs',
@@ -160,9 +154,9 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflo
     })],
   });
 
-  new Policy(args.context, `PipelinePolicyInstances-${args.workflowName}`, {
+  new iam.Policy(args.context, `PipelinePolicyInstances-${args.workflowName}`, {
     roles: [rolePipeline],
-    statements: [new PolicyStatement({
+    statements: [new iam.PolicyStatement({
       actions: [
         'ecs:DescribeTasks',
         'ec2:DescribeInstances',
@@ -175,9 +169,9 @@ export function getBaseBatchInstancePipelineRole(args: { context: Stack, workflo
     })],
   });
 
-  new Policy(args.context, `PipelinePolicyECR-${args.workflowName}`, {
+  new iam.Policy(args.context, `PipelinePolicyECR-${args.workflowName}`, {
     roles: [rolePipeline],
-    statements: [new PolicyStatement({
+    statements: [new iam.PolicyStatement({
       actions: [
         'ecr:GetAuthorizationToken',
         'ecr:BatchCheckLayerAvailability',

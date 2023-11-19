@@ -1,62 +1,57 @@
-import {Construct} from "constructs"
+import { Construct } from 'constructs'
 
-import {
-  Environment,
-  Stack,
-  StackProps,
-  Stage,
-  Tags,
-} from "aws-cdk-lib";
+import * as cdk from 'aws-cdk-lib';
 
+import * as baseStack from './base-pipeline-stack';
 import * as settings from './settings';
-import {BasePipelineStack} from './base-pipeline-stack';
 
-import {OncoanalyserStack} from './pipeline-stacks/oncoanalyser/stack';
-import {SashStack} from './pipeline-stacks/sash/stack';
-import {StarAlignNfStack} from './pipeline-stacks/star-align-nf/stack';
+import { OncoanalyserStack } from './pipeline-stacks/oncoanalyser/stack';
+import { SashStack } from './pipeline-stacks/sash/stack';
+import { StarAlignNfStack } from './pipeline-stacks/star-align-nf/stack';
 
 
-interface IApplicationBuildStackProps extends StackProps {
-  env: Environment;
+interface IApplicationBuildStackProps extends cdk.StackProps {
+  env: cdk.Environment;
   envName: string;
-  envBuild: Environment;
+  envBuild: cdk.Environment;
   dockerTag?: string;
 }
 
 interface IBuildStack extends IApplicationBuildStackProps {
   workflowName: string;
-  jobQueuePipelineArn: string;
-  jobQueueTaskArns: Map<string, string>;
+  jobQueuePipelineArns: string[];
+  jobQueueTaskArns: string[];
 }
 
-export class ApplicationStack extends Stack {
+
+export class ApplicationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: IApplicationBuildStackProps) {
     super(scope, id, props);
 
     // Create shared resources and add tags
-    const stackPipelineBase = new BasePipelineStack(this, 'BasePipelineStack', {
+    const stackPipelineBase = new baseStack.BasePipelineStack(this, 'BasePipelineStack', {
       env: props.env,
     });
-    Tags.of(stackPipelineBase).add("Stack", "NextflowStack");
+    cdk.Tags.of(stackPipelineBase).add('Stack', 'NextflowStack');
 
     // Create individual pipeline stacks
     this.buildOncoanalyserStack({
       workflowName: 'oncoanalyser',
-      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
+      jobQueuePipelineArns: stackPipelineBase.jobQueuePipelineArns,
       jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
       ...props,
     });
 
     this.buildSashStack({
       workflowName: 'sash',
-      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
+      jobQueuePipelineArns: stackPipelineBase.jobQueuePipelineArns,
       jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
       ...props,
     });
 
     this.buildStarAlignNfStack({
       workflowName: 'star-align-nf',
-      jobQueuePipelineArn: stackPipelineBase.jobQueuePipelineArn,
+      jobQueuePipelineArns: stackPipelineBase.jobQueuePipelineArns,
       jobQueueTaskArns: stackPipelineBase.jobQueueTaskArns,
       ...props,
     });
@@ -76,7 +71,7 @@ export class ApplicationStack extends Stack {
       refdataPrefix: s3Data.get('refdataPrefix')!,
       ssmParameters: stackSettings.getSsmParameters(),
     });
-    Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
+    cdk.Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
   }
 
   buildSashStack(args: IBuildStack) {
@@ -93,7 +88,7 @@ export class ApplicationStack extends Stack {
       refdataPrefix: s3Data.get('refdataPrefix')!,
       ssmParameters: stackSettings.getSsmParameters(),
     });
-    Tags.of(pipelineStack).add('Stack', 'SashStack');
+    cdk.Tags.of(pipelineStack).add('Stack', 'SashStack');
   }
 
   buildStarAlignNfStack(args: IBuildStack) {
@@ -110,16 +105,17 @@ export class ApplicationStack extends Stack {
       refdataPrefix: s3Data.get('refdataPrefix')!,
       ssmParameters: stackSettings.getSsmParameters(),
     });
-    Tags.of(pipelineStack).add('Stack', 'StarAlignNfStack');
+    cdk.Tags.of(pipelineStack).add('Stack', 'StarAlignNfStack');
   }
 }
 
-export class ApplicationBuildStage extends Stage {
+
+export class ApplicationBuildStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: IApplicationBuildStackProps) {
     super(scope, id, props);
 
     const applicationStack = new ApplicationStack(this, 'NextflowApplicationStack', props);
 
-    Tags.of(applicationStack).add("Stack", "NextflowStack");
+    cdk.Tags.of(applicationStack).add('Stack', 'NextflowStack');
   }
 }
