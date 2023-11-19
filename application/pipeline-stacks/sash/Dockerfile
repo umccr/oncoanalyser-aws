@@ -1,16 +1,17 @@
 FROM docker.io/continuumio/miniconda3:22.11.1
 
-# Set nextflow version
+# Set package versions and other info
+# Nextflow
 ARG NEXTFLOW_VERSION="23.04.3"
 ARG NEXTFLOW_PATH="/opt/nextflow"
 
-# Set jq version
+# Package versions
 ARG JQ_VERSION="1.6"
-ARG OPEN_JDK_VERSION="17.0.7"
+ARG OPEN_JDK_VERSION="17.0.9"
 ARG PARALLEL_VERSION="20230322"
 ARG RCLONE_VERSION="1.62.2"
 
-# Set container versions
+# Docker packages
 ARG DEBIAN_PLATFORM_VERSION="debian.11~bullseye_amd64"
 ARG CONTAINERD_IO_VERSION="1.6.18-1"
 ARG DOCKER_BUILDX_VERSION="0.10.2-1"
