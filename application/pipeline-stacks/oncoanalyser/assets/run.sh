@@ -546,7 +546,7 @@ fi
 
 # NOTE(SW): using new conditional block to separate functionality
 nextflow_args=''
-if [[ "${mode}" =~ w(g|t|gt)s ]]; then
+if [[ "${mode}" =~ ^w(g|t|gt)s$ ]]; then
   nextflow_args='--mode wgts'
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
   nextflow_args='--mode wgts --processes_exclude isofox'
