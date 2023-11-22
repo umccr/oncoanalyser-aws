@@ -172,26 +172,30 @@ export class BasePipelineStack extends cdk.Stack {
     // NOTE(SW): using UserData.addCommands does not render with a MIME block when passed to the
     // batch-alpha.ComputeEnvironment, which then results in an invalid compute environment
 
-    let userDataFn: string;
-    switch(args.storageType) {
-      case(constants.InstanceStorageType.EbsOnly):
-        userDataFn = 'ebs.txt';
-        break;
-      case(constants.InstanceStorageType.NvmeSsdOnly):
-        userDataFn = 'nvme.txt';
-        break;
-      default:
-        throw new Error('Got bad storage type');
+    // Get and apply user data for all task lts and only for the pipeline + FusionFS/NVMeSSD lts. No
+    // user data is currently needed for the pipeline + EBS lts.
+    let userDataTask
+    if (args.namespace == 'BaseTask' || (args.namespace == 'BasePipeline' && args.storageType === constants.InstanceStorageType.NvmeSsdOnly)) {
+      let userDataFn: string;
+      switch(args.storageType) {
+        case(constants.InstanceStorageType.EbsOnly):
+          userDataFn = 'ebs.txt';
+          break;
+        case(constants.InstanceStorageType.NvmeSsdOnly):
+          userDataFn = 'nvme.txt';
+          break;
+        default:
+          throw new Error('Got bad storage type');
+      }
+
+      const userDataFp: string = path.join(__dirname, 'resources/launch_templates/', userDataFn);
+      const userDataString = fs.readFileSync(userDataFp, {encoding: 'utf-8'});
+      userDataTask = ec2.UserData.custom(userDataString);
     }
-
-    const userDataFp: string = path.join(__dirname, 'resources/launch_templates/', userDataFn);
-
-    const userDataString = fs.readFileSync(userDataFp, {encoding: 'utf-8'});
-    const userDataTask = ec2.UserData.custom(userDataString);
 
     const launchTemplate = new ec2.LaunchTemplate(this, `${args.namespace}LaunchTemplate-${args.storageType.toLowerCase()}`, {
       launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-${args.storageType.toLowerCase()}-launch-template`,
-      userData: (args.namespace == 'BaseTask') ? userDataTask : undefined,
+      userData: userDataTask,
     });
 
     let instanceName: string;
