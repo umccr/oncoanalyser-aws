@@ -509,7 +509,7 @@ ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},norma
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sage_dir,${existing_wgs_dir}/sage/somatic/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,sage_dir,${existing_wgs_dir}/sage/germline/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/reportable/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,dna,purple_dir,${existing_wgs_dir}/purple/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
@@ -529,7 +529,7 @@ ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},norma
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,sage_dir,${existing_wgs_dir}/sage/somatic/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,sage_dir,${existing_wgs_dir}/sage/germline/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_anno_dir,${existing_wgs_dir}/linx/somatic_annotations/
-${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/reportable/
+${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,linx_plot_dir,${existing_wgs_dir}/linx/somatic_plots/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,linx_anno_dir,${existing_wgs_dir}/linx/germline_annotations/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor_normal,dna,purple_dir,${existing_wgs_dir}/purple/
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,virusinterpreter_dir,${existing_wgs_dir}/virusinterpreter/
