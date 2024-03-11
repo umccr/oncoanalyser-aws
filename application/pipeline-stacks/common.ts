@@ -85,7 +85,7 @@ export class PipelineStack extends cdk.Stack {
         image: dockerStack.image,
         command: ['true'],
         memory: cdk.Size.mebibytes(1000),
-        executionRole: stackRoles.pipelineRole,
+        jobRole: stackRoles.pipelineRole,
         // NOTE(SW): host Docker socket is mounted in the container to launch Docker containers for local processes
         volumes: [
           batch.EcsVolume.host({
