@@ -3,7 +3,7 @@ import { Construct } from 'constructs';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import * as batchAlpha from '@aws-cdk/aws-batch-alpha';
+import * as batch from 'aws-cdk-lib/aws-batch';
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs  from 'aws-cdk-lib/aws-ecs';
@@ -62,10 +62,6 @@ export class BasePipelineStack extends cdk.Stack {
       workflowName: 'base',
     });
 
-    const profileBatchInstanceTask = new iam.CfnInstanceProfile(this, 'BaseTaskBatchInstanceProfile', {
-      roles: [roleBatchInstanceTask.roleName],
-    });
-
     let roleBatchSpotfleetTask;
     if (args.queueTypes.includes(constants.QueueType.Spot)) {
 
@@ -79,7 +75,7 @@ export class BasePipelineStack extends cdk.Stack {
     }
 
     for (let storageType of args.storageTypes) {
-      const launchTemplateTask = this.getLaunchTemplateSpec({
+      const launchTemplateTask = this.getLaunchTemplate({
         namespace: 'BaseTask',
         storageType: storageType,
       });
@@ -97,7 +93,7 @@ export class BasePipelineStack extends cdk.Stack {
             vpc: args.vpc,
             securityGroup: args.securityGroup,
             launchTemplate: launchTemplateTask,
-            profileBatchInstance: profileBatchInstanceTask,
+            roleBatchInstance: roleBatchInstanceTask,
             roleBatchSpotfleet: roleBatchSpotfleetTask,
             serviceType: constants.ServiceType.Task,
           });
@@ -120,10 +116,6 @@ export class BasePipelineStack extends cdk.Stack {
       jobQueueArns: Array.from(this.jobQueueTaskArns.values()),
     });
 
-    const profileBatchInstance = new iam.CfnInstanceProfile(this, 'BasePipelineBatchInstanceProfile', {
-      roles: [roleBatchInstance.roleName],
-    });
-
 
     // NOTE(SW): here we make a special case for the pipeline queue in the UMCCR environment. This exception is designed
     // to met existing compatibility requirements for the external orchestrator service (single queue, constant queue
@@ -137,7 +129,7 @@ export class BasePipelineStack extends cdk.Stack {
     const storageType = constants.InstanceStorageType.NvmeSsdOnly;
 
 
-    const launchTemplate = this.getLaunchTemplateSpec({
+    const launchTemplate = this.getLaunchTemplate({
       namespace: 'BasePipeline',
       storageType: storageType,
     });
@@ -149,7 +141,7 @@ export class BasePipelineStack extends cdk.Stack {
       vpc: args.vpc,
       securityGroup: args.securityGroup,
       launchTemplate: launchTemplate,
-      profileBatchInstance: profileBatchInstance,
+      roleBatchInstance: roleBatchInstance,
       serviceType: constants.ServiceType.Pipeline,
       queueName: queueName,
     });
@@ -157,7 +149,7 @@ export class BasePipelineStack extends cdk.Stack {
     this.jobQueuePipelineArns.push(jobQueue.jobQueueArn);
   }
 
-  getLaunchTemplateSpec(args: {
+  getLaunchTemplate(args: {
     namespace: string,
     storageType: constants.InstanceStorageType,
   }) {
@@ -219,12 +211,12 @@ export class BasePipelineStack extends cdk.Stack {
     storageType: constants.InstanceStorageType,
     vpc: ec2.IVpc,
     securityGroup: ec2.ISecurityGroup,
-    launchTemplate: batchAlpha.LaunchTemplateSpecification,
-    profileBatchInstance: iam.CfnInstanceProfile,
+    launchTemplate: ec2.ILaunchTemplate,
+    roleBatchInstance: iam.Role,
     roleBatchSpotfleet?: iam.Role,
     serviceType: constants.ServiceType,
     queueName?: string,
-  }): [batchAlpha.ComputeEnvironment, batchAlpha.JobQueue] {
+  }): [batch.ManagedEc2EcsComputeEnvironment, batch.JobQueue] {
 
     let queueDataInstanceTypeKey: string;
     switch (args.storageType) {
@@ -247,16 +239,16 @@ export class BasePipelineStack extends cdk.Stack {
         return new ec2.InstanceType(typeStr);
       });
 
-    let resourceType;
+    let spotMode;
     let allocationStrategy;
     switch (args.queueType) {
       case constants.QueueType.Ondemand:
-        resourceType = batchAlpha.ComputeResourceType.ON_DEMAND;
-        allocationStrategy = batchAlpha.AllocationStrategy.BEST_FIT;
+        spotMode = false;
+        allocationStrategy = batch.AllocationStrategy.BEST_FIT;
         break;
       case constants.QueueType.Spot:
-        resourceType = batchAlpha.ComputeResourceType.SPOT;
-        allocationStrategy = batchAlpha.AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
+        spotMode = false;
+        allocationStrategy = batch.AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
         break;
       default:
         throw new Error('Got bad queue type');
@@ -275,30 +267,24 @@ export class BasePipelineStack extends cdk.Stack {
     }
 
     const computeEnvId = `BaseComputeEnvironment-${queueName}`;
-    const computeEnvironment = new batchAlpha.ComputeEnvironment(this, computeEnvId, {
-      computeResources: {
-        vpc: args.vpc,
-        allocationStrategy: allocationStrategy,
-        desiredvCpus: 0,
-        image: ecs.EcsOptimizedImage.amazonLinux2(),
-        instanceRole: args.profileBatchInstance.attrArn,
-        instanceTypes: instanceTypes,
-        launchTemplate: {
-          launchTemplateId: args.launchTemplate.launchTemplateId as string,
-          version: '$Latest',
-        },
-        maxvCpus: args.queueData.maxvCpus ?? settings.maxvCpusDefault,
-        securityGroups: [args.securityGroup],
-        spotFleetRole: args.roleBatchSpotfleet,
-        vpcSubnets: {
-          subnetType: ec2.SubnetType.PUBLIC,
-        },
-        type: resourceType,
+    const computeEnvironment = new batch.ManagedEc2EcsComputeEnvironment(this, computeEnvId, {
+      allocationStrategy: allocationStrategy,
+      instanceRole: args.roleBatchInstance,
+      instanceTypes: instanceTypes,
+      launchTemplate: args.launchTemplate,
+      maxvCpus: args.queueData.maxvCpus ?? settings.maxvCpusDefault,
+      securityGroups: [args.securityGroup],
+      spot: spotMode,
+      spotFleetRole: args.roleBatchSpotfleet,
+      useOptimalInstanceClasses: false,
+      vpc: args.vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
       },
     });
 
     const jobQueueId = `BaseJobQueue-${queueName}`;
-    const jobQueue = new batchAlpha.JobQueue(this, jobQueueId, {
+    const jobQueue = new batch.JobQueue(this, jobQueueId, {
       jobQueueName: `nextflow-${queueName}`,
       computeEnvironments: [
         { computeEnvironment: computeEnvironment, order: 1 },

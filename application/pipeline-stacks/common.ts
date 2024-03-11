@@ -2,7 +2,7 @@ import * as path from 'path';
 
 import { Construct } from 'constructs';
 
-import * as batchAlpha from '@aws-cdk/aws-batch-alpha';
+import * as batch from 'aws-cdk-lib/aws-batch';
 import * as cdk from 'aws-cdk-lib';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
@@ -79,28 +79,22 @@ export class PipelineStack extends cdk.Stack {
     refdataBucket.grantRead(stackRoles.pipelineRole, `${props.refdataPrefix}/*`);
 
     // Create job definition for pipeline execution
-    const pipelineJobDefinition = new batchAlpha.JobDefinition(this, `Nextflow-${props.workflowName}`, {
-      container: {
+    const pipelineJobDefinition = new batch.EcsJobDefinition(this, `Nextflow-${props.workflowName}`, {
+      container: new batch.EcsEc2ContainerDefinition(this, `Nextflow-Container-${props.workflowName}`, {
+        cpu: 1,
         image: dockerStack.image,
         command: ['true'],
-        memoryLimitMiB: 1000,
-        vcpus: 1,
-        jobRole: stackRoles.pipelineRole,
+        memory: cdk.Size.mebibytes(1000),
+        executionRole: stackRoles.pipelineRole,
         // NOTE(SW): host Docker socket is mounted in the container to launch Docker containers for local processes
-        mountPoints: [
-          {
-            sourceVolume: 'docker_socket',
-            containerPath: '/var/run/docker.sock',
-            readOnly: false,
-          },
-        ],
         volumes: [
-          {
+          batch.EcsVolume.host({
             name: 'docker_socket',
-            host: { 'sourcePath': '/var/run/docker.sock' }
-          },
+            containerPath: '/var/run/docker.sock',
+            readonly: false,
+          }),
         ],
-      },
+      }),
     });
 
     // Create Lambda function role

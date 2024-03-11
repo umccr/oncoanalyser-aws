@@ -1,5 +1,3 @@
-import * as batchAlpha from '@aws-cdk/aws-batch-alpha';
-
 import * as constants from '../constants';
 
 
