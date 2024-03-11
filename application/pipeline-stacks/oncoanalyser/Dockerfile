@@ -1,13 +1,10 @@
-FROM docker.io/continuumio/miniconda3:22.11.1
+FROM docker.io/continuumio/miniconda3:23.10.0-1
 
 # Set package versions and other info
-# Nextflow
-ARG NEXTFLOW_VERSION="23.04.3"
-ARG NEXTFLOW_PATH="/opt/nextflow"
-
-# Package versions
+# Generic
 ARG JQ_VERSION="1.6"
-ARG OPENJDK_VERSION="17.0.9"
+ARG NEXTFLOW_VERSION="23.04.3"
+ARG OPENJDK_VERSION="17.0.10"
 ARG PARALLEL_VERSION="20230322"
 ARG RCLONE_VERSION="1.62.2"
 
@@ -44,7 +41,6 @@ RUN \
   apt install -y -q \
     curl \
     jq="${JQ_VERSION}*" \
-    openjdk-17-jre="${OPEN_JDK_VERSION}*" \
     unzip \
     wget && \
   apt clean -y -q
@@ -52,22 +48,11 @@ RUN \
 # Install packages with Conda
 RUN \
   conda install --yes \
+    "nextflow ==${NEXTFLOW_VERSION}" \
+    "openjdk ==${OPENJDK_VERSION}" \
     "parallel ==${PARALLEL_VERSION}" \
-    "rclone ==${RCLONE_VERSION}" \
-    && \
+    "rclone ==${RCLONE_VERSION}" && \
   conda clean --all --force-pkgs-dirs --yes
-
-# Install Nextflow
-RUN \
-  mkdir "${NEXTFLOW_PATH}" && \
-  ( \
-    cd "${NEXTFLOW_PATH}" && \
-    wget --quiet --output-document - get.nextflow.io | \
-    NXF_VER="${NEXTFLOW_VERSION}" bash \
-  )
-
-# Export Nextflow install path
-ENV PATH "${NEXTFLOW_PATH}:$PATH"
 
 # Install AWS CLIv2
 RUN \
