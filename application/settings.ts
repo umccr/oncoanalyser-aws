@@ -73,7 +73,7 @@ export class Oncoanalyser extends Shared {
       ...super.getS3Data().entries(),
       ['refdataGenomesPath', 'genomes'],
       ['refdataHmfPath', 'hmf_reference_data/hmftools/5.34_38--0'],
-      ['refDataVirusbreakendDbPath', 'virusbreakend/virusbreakenddb_20210401'],
+      ['refDataVirusbreakendDbPath', 'databases/virusbreakend/virusbreakenddb_20210401'],
     ]);
   }
 

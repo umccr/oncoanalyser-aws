@@ -196,6 +196,8 @@ export class BasePipelineStack extends cdk.Stack {
     const launchTemplate = new ec2.LaunchTemplate(this, `${args.namespace}LaunchTemplate-${args.storageType.toLowerCase()}`, {
       launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-${args.storageType.toLowerCase()}-launch-template`,
       userData: userDataTask,
+      requireImdsv2: true,
+      httpTokens: ec2.LaunchTemplateHttpTokens.REQUIRED,
     });
 
     let instanceName: string;

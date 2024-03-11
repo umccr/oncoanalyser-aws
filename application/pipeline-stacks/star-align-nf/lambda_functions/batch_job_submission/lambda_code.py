@@ -66,11 +66,11 @@ def main(event, context):
             'version': get_ssm_parameter_value('/nextflow_stack/star-align-nf/pipeline_version_tag'),
             'output': json.dumps({'output_directory': output_directory}),
         },
-        tags=[
-            {'key': 'Stack', 'value': 'NextflowStack'},
-            {'key': 'SubStack', 'value': 'star-align-nf'},
-            {'key': 'RunId', 'value': event['portal_run_id']}
-        ],
+        tags={
+            'Stack': 'NextflowStack',
+            'SubStack': 'StarAlignNfStack',
+            'RunId': event['portal_run_id'],
+        },
         propagateTags=True
     )
 

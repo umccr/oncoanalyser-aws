@@ -111,11 +111,13 @@ export class PipelineStack extends cdk.Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
       ]
     });
+
     new iam.Policy(this, `LambdaBatchPolicy-${props.workflowName}`, {
       roles: [lambdaSubmissionRole],
       statements: [new iam.PolicyStatement({
         actions: [
           'batch:SubmitJob',
+          'batch:TagResource',
         ],
         resources: [
           ...props.jobQueuePipelineArns,

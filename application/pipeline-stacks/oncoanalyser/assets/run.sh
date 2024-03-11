@@ -388,11 +388,18 @@ upload_data() {
 
 ## END FUNCTIONS ##
 
+## MISC SETUP ##
+
+# Get IMDSv2 session token to make metadata requests
+IMDS_TOKEN=$(curl -s -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" http://169.254.169.254/latest/api/token)
+
+## END MISC SETUP ##
+
 ## SET AWS REGION ##
 
 # Get the current aws region
 # https://stackoverflow.com/questions/4249488/find-region-from-within-an-ec2-instance
-export AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+export AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/placement/region)
 
 ## END SET AWS REGION ##
 
@@ -411,7 +418,7 @@ export AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/re
 # at runtime to a profile with the required permissions. Here I associate the instance with the OncoanalyserStack task
 # role. There may be better approaches to achieve this.
 
-instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+instance_id=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/instance-id)
 association_id=$(
   aws ec2 describe-iam-instance-profile-associations | \
     jq --raw-output \
