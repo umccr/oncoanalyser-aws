@@ -3,10 +3,12 @@ set -euo pipefail
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --subject_id STR --sample_id STR --library_id STR --fastq_fwd FILE --fastq_rev FILE
+Usage example: run.sh --portal_run_id STR --subject_id STR --sample_id STR --library_id STR --fastq_fwd FILE --fastq_rev FILE
 
 Options:
-  --subject_id STR              Subject identifier
+  --portal_run_id STR           Portal run id
+
+  --subject_id STR              Subject id
 
   --sample_id STR               Tumor WTS sample identifier
   --library_id STR              Tumor WTS library identifier
@@ -22,6 +24,11 @@ EOF
 
 while [ $# -gt 0 ]; do
   case "$1" in
+
+    --portal_run_id)
+      portal_run_id="$2"
+      shift 1
+    ;;
 
     --subject_id)
       subject_id="$2"
@@ -67,6 +74,7 @@ while [ $# -gt 0 ]; do
 done
 
 required_args='
+portal_run_id
 subject_id
 sample_id
 library_id
@@ -328,7 +336,11 @@ NEXTFLOW_CONFIG_PATH="aws.config"
 
 sed \
   --regexp-extended \
-  --expression "s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g" \
+  --expression \
+    "
+      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g;
+      s#__PORTAL_RUN_ID__#${portal_run_id}#g;
+    " \
   "${TEMPLATE_CONFIG_PATH}" > "${NEXTFLOW_CONFIG_PATH}"
 
 ## END CREATE NEXTFLOW CONFIG ##

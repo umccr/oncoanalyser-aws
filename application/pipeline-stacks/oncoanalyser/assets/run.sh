@@ -14,12 +14,14 @@ NEXTFLOW_CONFIG_PATH="aws.config"
 
 print_help_text() {
   cat <<EOF
-Usage example: run.sh --mode wgs --subject_id STR --tumor_wgs_sample_id STR --tumor_wgs_library_id STR --tumor_wgs_bam FILE --normal_wgs_sample_id STR --normal_wgs_library_id STR --normal_wgs_bam FILE
+Usage example: run.sh --portal_run_id STR --mode STR --subject_id STR --tumor_wgs_sample_id STR --tumor_wgs_library_id STR --tumor_wgs_bam FILE --normal_wgs_sample_id STR --normal_wgs_library_id STR --normal_wgs_bam FILE
 
 Options:
+  --portal_run_id STR           Portal run id
+
   --mode STR                    Mode to run [wgs, wts, wgts, wgts_existing_wgs, wgts_existing_wts, wgts_existing_both]
 
-  --subject_id STR              Subject identifier
+  --subject_id STR              Subject id
 
   --tumor_wgs_sample_id STR     Tumor WGS sample identifier
   --tumor_wgs_library_id STR    Tumor WGS library identifier
@@ -47,6 +49,11 @@ EOF
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --portal_run_id)
+      portal_run_id="$2"
+      shift 1
+    ;;
+
     --mode)
       mode="$2"
       shift 1
@@ -142,6 +149,7 @@ if [[ -z "${mode:-}" ]]; then
 fi
 
 required_args='
+portal_run_id
 subject_id
 output_results_dir
 output_staging_dir
@@ -575,7 +583,8 @@ sed \
   --expression \
     "
       s#__S3_GENOMES_DATA_PATH__#s3://$(get_genomes_path_from_ssm)#g;
-      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g
+      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g;
+      s#__PORTAL_RUN_ID__#${portal_run_id}#g;
     " \
   "${TEMPLATE_CONFIG_PATH}" > "${NEXTFLOW_CONFIG_PATH}"
 

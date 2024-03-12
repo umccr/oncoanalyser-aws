@@ -150,6 +150,7 @@ def get_job_command(event):
 
     command_components = [
         './assets/run.sh',
+        f'--portal_run_id {event["portal_run_id"]}',
         f'--mode {event["mode"]}',
         f'--subject_id {event["subject_id"]}',
         f'--output_results_dir {output_results_dir}',
