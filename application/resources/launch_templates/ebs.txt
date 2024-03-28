@@ -23,8 +23,9 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 /tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
 ln -s /opt/awscliv2/bin/aws /usr/local/bin/
 
-# NOTE(SW): using a fork until IMDSv2 support is fixed upstream, PR: https://github.com/awslabs/amazon-ebs-autoscale/pull/72
-git clone -b update_IMDSV2_support https://github.com/scwatts/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
+git clone https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
+(cd /tmp/amazon-ebs-autoscale/ && git checkout 6db0c70)
+
 bash /tmp/amazon-ebs-autoscale/install.sh --imdsv2
 
 rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
