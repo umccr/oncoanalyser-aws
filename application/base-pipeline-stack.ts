@@ -240,14 +240,17 @@ export class BasePipelineStack extends cdk.Stack {
       });
 
     let spotMode;
+    let roleBatchSpotfleet;
     let allocationStrategy;
     switch (args.queueType) {
       case constants.QueueType.Ondemand:
         spotMode = false;
+        roleBatchSpotfleet = undefined;
         allocationStrategy = batch.AllocationStrategy.BEST_FIT;
         break;
       case constants.QueueType.Spot:
         spotMode = false;
+        roleBatchSpotfleet = args.roleBatchSpotfleet;
         allocationStrategy = batch.AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
         break;
       default:
@@ -275,7 +278,7 @@ export class BasePipelineStack extends cdk.Stack {
       maxvCpus: args.queueData.maxvCpus ?? settings.maxvCpusDefault,
       securityGroups: [args.securityGroup],
       spot: spotMode,
-      spotFleetRole: args.roleBatchSpotfleet,
+      spotFleetRole: roleBatchSpotfleet,
       useOptimalInstanceClasses: false,
       vpc: args.vpc,
       vpcSubnets: {
