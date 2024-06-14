@@ -18,7 +18,7 @@ ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
 ARG PIPELINE_GITHUB_REF  // NOTE(SW): must be provided as build argument
-ARG PIPELINE_GITHUB_REPO_URL="https://github.com/scwatts/oncoanalyser.git"
+ARG PIPELINE_GITHUB_REPO_URL="https://github.com/nf-core/oncoanalyser"
 
 RUN \
   test -n "${PIPELINE_GITHUB_REF}" || (echo "PIPELINE_GITHUB_REF must be set" && false)

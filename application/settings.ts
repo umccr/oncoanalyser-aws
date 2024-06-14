@@ -66,13 +66,13 @@ export class StarAlignNf extends Shared {
 
 
 export class Oncoanalyser extends Shared {
-  readonly versionTag = 'v0.3.1'
+  readonly versionTag = 'dev'
 
   getS3Data() {
     return new Map<string, string>([
       ...super.getS3Data().entries(),
       ['refdataGenomesPath', 'genomes'],
-      ['refdataHmfPath', 'hmf_reference_data/hmftools/5.34_38--0'],
+      ['refdataHmfPath', 'hmf_reference_data/hmftools/5.34_38--2'],
       ['refDataVirusbreakendDbPath', 'databases/virusbreakend/virusbreakenddb_20210401'],
     ]);
   }
