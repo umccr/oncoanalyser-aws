@@ -78,6 +78,7 @@ export class BasePipelineStack extends cdk.Stack {
       const launchTemplateTask = this.getLaunchTemplate({
         namespace: 'BaseTask',
         storageType: storageType,
+        securityGroup: args.securityGroup,
       });
 
       for (let queueType of args.queueTypes) {
@@ -91,7 +92,6 @@ export class BasePipelineStack extends cdk.Stack {
             queueType: queueType,
             storageType: storageType,
             vpc: args.vpc,
-            securityGroup: args.securityGroup,
             launchTemplate: launchTemplateTask,
             roleBatchInstance: roleBatchInstanceTask,
             roleBatchSpotfleet: roleBatchSpotfleetTask,
@@ -132,6 +132,7 @@ export class BasePipelineStack extends cdk.Stack {
     const launchTemplate = this.getLaunchTemplate({
       namespace: 'BasePipeline',
       storageType: storageType,
+      securityGroup: args.securityGroup,
     });
 
     const [computeEnvironment, jobQueue] = this.getComputeEnvironment({
@@ -139,7 +140,6 @@ export class BasePipelineStack extends cdk.Stack {
       queueType: constants.QueueType.Ondemand,
       storageType: storageType,
       vpc: args.vpc,
-      securityGroup: args.securityGroup,
       launchTemplate: launchTemplate,
       roleBatchInstance: roleBatchInstance,
       serviceType: constants.ServiceType.Pipeline,
@@ -152,6 +152,7 @@ export class BasePipelineStack extends cdk.Stack {
   getLaunchTemplate(args: {
     namespace: string,
     storageType: constants.InstanceStorageType,
+    securityGroup: ec2.ISecurityGroup,
   }) {
 
     // NOTE(SW): EBS user data installs required packages for Amazon Elastic Block Store Autoscale
@@ -187,7 +188,9 @@ export class BasePipelineStack extends cdk.Stack {
 
     const launchTemplate = new ec2.LaunchTemplate(this, `${args.namespace}LaunchTemplate-${args.storageType.toLowerCase()}`, {
       launchTemplateName: `nextflow-${args.namespace.toLowerCase()}-${args.storageType.toLowerCase()}-launch-template`,
+      associatePublicIpAddress: true,
       userData: userDataTask,
+      securityGroup: args.securityGroup,
       requireImdsv2: true,
       httpTokens: ec2.LaunchTemplateHttpTokens.REQUIRED,
     });
@@ -210,7 +213,6 @@ export class BasePipelineStack extends cdk.Stack {
     queueType: constants.QueueType,
     storageType: constants.InstanceStorageType,
     vpc: ec2.IVpc,
-    securityGroup: ec2.ISecurityGroup,
     launchTemplate: ec2.ILaunchTemplate,
     roleBatchInstance: iam.Role,
     roleBatchSpotfleet?: iam.Role,
@@ -269,6 +271,12 @@ export class BasePipelineStack extends cdk.Stack {
       });
     }
 
+    // NOTE(SW): the new default behaviour of UMCCR subnets to not assign/associate public IP addresses for EC2
+    // instances is overridden in the launch template. However, setting this override causes the launch template to
+    // create a network interface, which includes a security group. The consequence of this is that the security group
+    // configuration must be moved to the launch template since it cannot be defined in both the compute environment or
+    // launch template network interface. This is done in part below by setting the `securityGroups` arg as an empty list.
+
     const computeEnvId = `BaseComputeEnvironment-${queueName}`;
     const computeEnvironment = new batch.ManagedEc2EcsComputeEnvironment(this, computeEnvId, {
       allocationStrategy: allocationStrategy,
@@ -276,7 +284,7 @@ export class BasePipelineStack extends cdk.Stack {
       instanceTypes: instanceTypes,
       launchTemplate: args.launchTemplate,
       maxvCpus: args.queueData.maxvCpus ?? settings.maxvCpusDefault,
-      securityGroups: [args.securityGroup],
+      securityGroups: [],
       spot: spotMode,
       spotFleetRole: roleBatchSpotfleet,
       useOptimalInstanceClasses: false,
