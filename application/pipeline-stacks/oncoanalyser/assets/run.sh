@@ -375,8 +375,14 @@ EOF
 }
 
 samplesheet_wgs_entries() {
-  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bam,${input_fps['tumor_wgs_bam']}"
-  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bam,${input_fps['normal_wgs_bam']}"
+  bam_type="${1}"
+  if ! [[ "${bam_type}" =~ ^(bam|bam_markdups)$ ]]; then
+    echo "got bad bam type WGS samplesheet entries" 1>&2
+    exit 1
+  fi
+
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,${bam_type},${input_fps['tumor_wgs_bam']}"
+  echo "${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,${bam_type},${input_fps['normal_wgs_bam']}"
 }
 
 samplesheet_wts_entries() {
@@ -488,7 +494,7 @@ EOF
 if [[ ${mode} == 'wgs' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wgs_entries)
+$(samplesheet_wgs_entries bam)
 EOF
 
 elif [[ ${mode} == 'wts' ]]; then
@@ -500,14 +506,14 @@ EOF
 elif [[ ${mode} == 'wgts' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wgs_entries)
+$(samplesheet_wgs_entries bam)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
 EOF
 
 elif [[ ${mode} == 'wgts_existing_wts' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wgs_entries)
+$(samplesheet_wgs_entries bam)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wts_sample_id},tumor,rna,isofox_dir,${existing_wts_dir}/isofox/
 EOF
@@ -515,7 +521,7 @@ EOF
 elif [[ ${mode} == 'wgts_existing_wgs' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wgs_entries)
+$(samplesheet_wgs_entries bam_markdups)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
@@ -535,7 +541,7 @@ EOF
 elif [[ ${mode} == 'wgts_existing_both' ]]; then
 
   cat <<EOF >> samplesheet.csv
-$(samplesheet_wgs_entries)
+$(samplesheet_wgs_entries bam_markdups)
 $(samplesheet_wts_entries "${tumor_wgs_sample_id}")
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${tumor_wgs_sample_id},tumor,dna,bamtools,${existing_wgs_dir}/bamtools/${tumor_wgs_sample_id}.wgsmetrics
 ${subject_id}_${tumor_wgs_sample_id},${subject_id},${normal_wgs_sample_id},normal,dna,bamtools,${existing_wgs_dir}/bamtools/${normal_wgs_sample_id}.wgsmetrics
