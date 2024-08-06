@@ -251,7 +251,7 @@ export class BasePipelineStack extends cdk.Stack {
         allocationStrategy = batch.AllocationStrategy.BEST_FIT;
         break;
       case constants.QueueType.Spot:
-        spotMode = false;
+        spotMode = true;
         roleBatchSpotfleet = args.roleBatchSpotfleet;
         allocationStrategy = batch.AllocationStrategy.SPOT_CAPACITY_OPTIMIZED;
         break;
