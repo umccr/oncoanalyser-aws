@@ -88,7 +88,9 @@ RUN \
   mkdir --parents "/root/pipeline/assets/" && \
   ( \
     cd "/root/pipeline/software/" && \
-    git clone --branch "${PIPELINE_GITHUB_REF}" "${PIPELINE_GITHUB_REPO_URL}" \
+    git clone "${PIPELINE_GITHUB_REPO_URL}" oncoanalyser/ && \
+    cd oncoanalyser && \
+    git checkout ${PIPELINE_GITHUB_REF} \
   )
 
 COPY assets/nextflow_aws.template.config /root/pipeline/assets/
