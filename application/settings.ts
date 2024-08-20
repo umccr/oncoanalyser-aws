@@ -66,7 +66,7 @@ export class StarAlignNf extends Shared {
 
 
 export class Oncoanalyser extends Shared {
-  readonly versionTag = '49872fc'
+  readonly versionTag = '42ee926'
 
   getS3Data() {
     return new Map<string, string>([
