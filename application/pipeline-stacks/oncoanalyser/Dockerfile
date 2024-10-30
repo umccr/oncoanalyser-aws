@@ -2,8 +2,8 @@ FROM docker.io/continuumio/miniconda3:23.10.0-1
 
 # Set package versions and other info
 # Generic
-ARG JQ_VERSION="1.6"
-ARG NEXTFLOW_VERSION="23.10.1"
+ARG JQ_VERSION="1.7.1"
+ARG NEXTFLOW_VERSION="24.04.4"
 ARG OPENJDK_VERSION="17.0.10"
 ARG PARALLEL_VERSION="20230322"
 ARG RCLONE_VERSION="1.62.2"
@@ -17,7 +17,8 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
-ARG PIPELINE_GITHUB_REF  // NOTE(SW): must be provided as build argument
+# NOTE(SW): PIPELINE_GITHUB_REF must be provided as build argument
+ARG PIPELINE_GITHUB_REF
 ARG PIPELINE_GITHUB_REPO_URL="https://github.com/nf-core/oncoanalyser"
 
 RUN \
@@ -40,10 +41,15 @@ RUN \
   apt update -y -q && \
   apt install -y -q \
     curl \
-    jq="${JQ_VERSION}*" \
     unzip \
     wget && \
   apt clean -y -q
+
+# Install jq 1.7 custom
+RUN wget \
+  --output-document /usr/bin/jq \
+  "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64" && \
+  chmod +x /usr/bin/jq
 
 # Install packages with Conda
 RUN \
@@ -95,8 +101,10 @@ RUN \
 
 COPY assets/nextflow_aws.template.config /root/pipeline/assets/
 COPY assets/run.sh /root/pipeline/assets/
+COPY assets/run-v2.sh /root/pipeline/assets/
 
 RUN \
-  chmod +x "/root/pipeline/assets/run.sh"
+  chmod +x "/root/pipeline/assets/run.sh" && \
+  chmod +x "/root/pipeline/assets/run-v2.sh"
 
 WORKDIR /root/pipeline/

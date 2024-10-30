@@ -93,8 +93,10 @@ RUN \
 
 COPY assets/nextflow_aws.template.config /root/pipeline/assets/
 COPY assets/run.sh /root/pipeline/assets/
+COPY assets/run-v2.sh /root/pipeline/assets/
 
 RUN \
-  chmod +x "/root/pipeline/assets/run.sh"
+  chmod +x "/root/pipeline/assets/run.sh" && \
+  chmod +x "/root/pipeline/assets/run-v2.sh"
 
 WORKDIR /root/pipeline/

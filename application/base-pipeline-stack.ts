@@ -6,7 +6,6 @@ import * as path from 'path';
 import * as batch from 'aws-cdk-lib/aws-batch';
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecs  from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 import * as baseRoles from './shared/base-roles';

@@ -25,6 +25,7 @@
     "cdk-ecr-deployment": "^3.0.33",
     "constructs": "^10.0.0",
     "moment": "^2.29.4",
-    "source-map-support": "^0.5.21"
+    "source-map-support": "^0.5.21",
+    "util": "^0.12.5"
   }
 }

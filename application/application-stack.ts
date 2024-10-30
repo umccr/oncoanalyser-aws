@@ -67,9 +67,13 @@ export class ApplicationStack extends cdk.Stack {
       nfBucketName: s3Data.get('nfBucketName')!,
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
+      orcabusDataS3BucketName: s3Data.get('orcabusS3BucketName')!,
+      orcabusDataS3ByobPrefix: s3Data.get('orcabusS3ByobPrefix')!,
+      orcabusDataS3PrefixOutput: s3Data.get('orcabusS3PrefixOutput')!,
+      orcabusDataS3PrefixTemp: s3Data.get('orcabusS3PrefixTemp')!,
       refdataBucketName: s3Data.get('refdataBucketName')!,
       refdataPrefix: s3Data.get('refdataPrefix')!,
-      ssmParameters: stackSettings.getSsmParameters(),
+      ssmParameters: stackSettings.getSsmParameters()
     });
     cdk.Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
   }
@@ -78,12 +82,16 @@ export class ApplicationStack extends cdk.Stack {
     const stackSettings = new settings.Sash(args.envName, args.workflowName);
     const s3Data = stackSettings.getS3Data();
 
-    const pipelineStack = new StarAlignNfStack(this, 'SashStack', {
+    const pipelineStack = new SashStack(this, 'SashStack', {
       ...args,
       pipelineVersionTag: stackSettings.versionTag,
       nfBucketName: s3Data.get('nfBucketName')!,
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
+      orcabusDataS3BucketName: s3Data.get('orcabusS3BucketName')!,
+      orcabusDataS3ByobPrefix: s3Data.get('orcabusS3ByobPrefix')!,
+      orcabusDataS3PrefixOutput: s3Data.get('orcabusS3PrefixOutput')!,
+      orcabusDataS3PrefixTemp: s3Data.get('orcabusS3PrefixTemp')!,
       refdataBucketName: s3Data.get('refdataBucketName')!,
       refdataPrefix: s3Data.get('refdataPrefix')!,
       ssmParameters: stackSettings.getSsmParameters(),
@@ -102,6 +110,10 @@ export class ApplicationStack extends cdk.Stack {
       nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
       nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
       refdataBucketName: s3Data.get('refdataBucketName')!,
+      orcabusDataS3BucketName: s3Data.get('orcabusS3BucketName')!,
+      orcabusDataS3ByobPrefix: s3Data.get('orcabusS3ByobPrefix')!,
+      orcabusDataS3PrefixOutput: s3Data.get('orcabusS3PrefixOutput')!,
+      orcabusDataS3PrefixTemp: s3Data.get('orcabusS3PrefixTemp')!,
       refdataPrefix: s3Data.get('refdataPrefix')!,
       ssmParameters: stackSettings.getSsmParameters(),
     });

@@ -35,6 +35,10 @@ export interface IPipelineStack extends cdk.StackProps {
   nfBucketName: string;
   nfPrefixTemp: string;
   nfPrefixOutput: string;
+  orcabusDataS3BucketName: string;
+  orcabusDataS3ByobPrefix: string;
+  orcabusDataS3PrefixTemp: string;
+  orcabusDataS3PrefixOutput: string;
   refdataBucketName: string;
   refdataPrefix: string;
   ssmParameters: Map<string, string>;
@@ -71,6 +75,26 @@ export class PipelineStack extends cdk.Stack {
     nfBucket.grantReadWrite(stackRoles.taskRole, `${props.nfPrefixOutput}/*/${props.workflowName}/*`);
     nfBucket.grantReadWrite(stackRoles.pipelineRole, `${props.nfPrefixOutput}/*/${props.workflowName}/*`);
 
+    // New bucket permissions
+    // We don't have control over this bucket from this stack
+    // Instead we are just granting permissions to the roles we create
+    const orcabusDataBucket = s3.Bucket.fromBucketName(this, `S3Bucket-orcabusDataBucket-${props.workflowName}`,
+      props.orcabusDataS3BucketName,
+    );
+
+    // Roles can read and write to the temp and output directories
+    // We don't finish with a slash on the prefix to allow for the wildcard
+    // because we have workflow names oncoanalyser-wgts-dna and oncoanalyser-wgts-rna
+    [
+        stackRoles.taskRole,
+        stackRoles.pipelineRole
+    ].forEach(role => {
+        orcabusDataBucket.grantReadWrite(role, `${props.orcabusDataS3PrefixTemp}*`);
+        orcabusDataBucket.grantDelete(role, `${props.orcabusDataS3PrefixTemp}*`);
+        orcabusDataBucket.grantReadWrite(role, `${props.orcabusDataS3PrefixOutput}*`);
+        orcabusDataBucket.grantRead(role, `${props.orcabusDataS3ByobPrefix}*`)
+    })
+
     const refdataBucket = s3.Bucket.fromBucketName(this, `S3Bucket-refdataBucket-${props.workflowName}`,
       props.refdataBucketName,
     );
@@ -80,6 +104,7 @@ export class PipelineStack extends cdk.Stack {
 
     // Create job definition for pipeline execution
     const pipelineJobDefinition = new batch.EcsJobDefinition(this, `Nextflow-${props.workflowName}`, {
+      jobDefinitionName: `Nextflow-${props.workflowName}`,
       container: new batch.EcsEc2ContainerDefinition(this, `Nextflow-Container-${props.workflowName}`, {
         cpu: 1,
         image: dockerStack.image,

@@ -10,7 +10,7 @@ import {CodePipelineStack} from "./codepipeline-stack";
 
 const app = new App()
 
-const devApplicationSatck = new ApplicationStack(app, 'NextflowApplicationDevStack', {
+const devApplicationStack = new ApplicationStack(app, 'NextflowApplicationDevStack', {
   env: AWS_ENV_DEV,
   envName: AWS_ENV_DEV.name!,
   envBuild: AWS_ENV_DEV,

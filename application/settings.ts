@@ -1,4 +1,5 @@
 import * as constants from './constants'
+import {data} from "aws-cdk/lib/logging";
 
 
 export const taskQueueTypes = [
@@ -13,12 +14,31 @@ export const taskInstanceStorageTypes = [
 
 export const maxvCpusDefault = 128;
 
+export const dataAccountId = '503977275616';
+export const defaultRegion = 'ap-southeast-2';
 
 class Shared {
   constructor(public envName: string, public workflowName: string) {};
 
   getNfBucket() {
     return this.envName == 'prod' ? 'org.umccr.data.oncoanalyser' : `umccr-temp-${this.envName}`;
+  }
+
+  getOrcabusDataBucket() {
+    return `pipeline-${this.envName}-cache-${dataAccountId}-${defaultRegion}`
+  }
+
+  getOrcabusDataPrefix(): string {
+    if (this.envName == 'dev'){
+      return 'byob-icav2/development/'
+    }
+    if (this.envName == 'stg'){
+      return 'byob-icav2/staging/'
+    }
+    if (this.envName == 'prod'){
+      return 'byob-icav2/production/'
+    }
+    throw new Error("Don't know how to handle envName: " + this.envName);
   }
 
   getRefdataBasePath() {
@@ -30,6 +50,10 @@ class Shared {
       ['nfBucketName', this.getNfBucket()],
       ['nfPrefixTemp', 'temp_data'],
       ['nfPrefixOutput', 'analysis_data'],
+      ['orcabusS3BucketName', this.getOrcabusDataBucket()],
+      ['orcabusS3ByobPrefix', this.getOrcabusDataPrefix()],
+      ['orcabusS3PrefixTemp', `${this.getOrcabusDataPrefix()}cache/${this.workflowName}`],
+      ['orcabusS3PrefixOutput', `${this.getOrcabusDataPrefix()}analysis/${this.workflowName}`],
       ['refdataBucketName', `umccr-refdata-${this.envName}`],
       ['refdataPrefix', 'workflow_data'],
     ]);
