@@ -469,7 +469,7 @@ generate_wgts_dna_rna_to_samplesheet(){
           "sample_id": .inputs.tumor_rna_sample_id,
           "sample_type": "tumor",
           "sequence_type": "rna",
-          "filetype": "bam_markdups",
+          "filetype": "bam",
           "filepath": "\(.inputs.rna_oncoanalyser_analysis_uri)alignments/rna/\(.inputs.tumor_rna_sample_id).md.bam"
         },
         {
@@ -497,7 +497,7 @@ generate_wgts_dna_rna_to_samplesheet(){
           "sample_type": "tumor",
           "sequence_type": "dna",
           "filetype": "flagstat",
-          "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)flagstats/\(.inputs.tumor_wgs_sample_id).flagstat"
+          "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)flagstats/\(.inputs.tumor_dna_sample_id).flagstat"
         },
         {
           "group_id": "\(.inputs.tumor_dna_sample_id)_\(.inputs.normal_dna_sample_id)_\(.inputs.tumor_rna_sample_id)",
@@ -506,7 +506,7 @@ generate_wgts_dna_rna_to_samplesheet(){
           "sample_type": "normal",
           "sequence_type": "dna",
           "filetype": "flagstat",
-          "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)bamtools/\(.inputs.normal_dna_sample_id).wgsmetrics"
+          "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)flagstats/\(.inputs.normal_dna_sample_id).flagstat"
         },
         {
           "group_id": "\(.inputs.tumor_dna_sample_id)_\(.inputs.normal_dna_sample_id)_\(.inputs.tumor_rna_sample_id)",
@@ -537,8 +537,8 @@ generate_wgts_dna_rna_to_samplesheet(){
         },        {
           "group_id": "\(.inputs.tumor_dna_sample_id)_\(.inputs.normal_dna_sample_id)_\(.inputs.tumor_rna_sample_id)",
           "subject_id": .inputs.subject_id,
-          "sample_id": .inputs.normal_dna_sample_id,
-          "sample_type": "normal",
+          "sample_id": .inputs.tumor_dna_sample_id,
+          "sample_type": "tumor",
           "sequence_type": "dna",
           "filetype": "linx_plot_dir",
           "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)linx/somatic_plots/"
@@ -591,11 +591,11 @@ generate_wgts_dna_rna_to_samplesheet(){
         {
           "group_id": "\(.inputs.tumor_dna_sample_id)_\(.inputs.normal_dna_sample_id)_\(.inputs.tumor_rna_sample_id)",
           "subject_id": .inputs.subject_id,
-          "sample_id": .inputs.tumor_dna_sample_id,
+          "sample_id": .inputs.tumor_rna_sample_id,
           "sample_type": "tumor",
-          "sequence_type": "dna",
+          "sequence_type": "rna",
           "filetype": "isofox_dir",
-          "filepath": "\(.inputs.dna_oncoanalyser_analysis_uri)isofox/"
+          "filepath": "\(.inputs.rna_oncoanalyser_analysis_uri)isofox/"
         }
       ]
     ' <<< "${manifest_json}" | \
