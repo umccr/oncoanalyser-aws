@@ -1,13 +1,13 @@
 // import * as cdk from 'aws-cdk-lib';
 // import { Template } from 'aws-cdk-lib/assertions';
-// import * as NextflowStack from '../lib/nextflow-stack-stack';
+// import * as OncoanalyserStack from '../lib/oncoanalyser-stack-stack';
 
 // example test. To run these tests, uncomment this file along with the
-// example resource in lib/nextflow-stack-stack.ts
+// example resource in lib/oncoanalyser-stack-stack.ts
 test('SQS Queue Created', () => {
 //   const app = new cdk.App();
 //     // WHEN
-//   const stack = new NextflowStack.NextflowStackStack(app, 'MyTestStack');
+//   const stack = new OncoanalyserStack.OncoanalyserStackStack(app, 'MyTestStack');
 //     // THEN
 //   const template = Template.fromStack(stack);
 
