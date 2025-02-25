@@ -5,8 +5,15 @@ import * as path from 'path';
 
 import * as batch from 'aws-cdk-lib/aws-batch';
 import * as cdk from 'aws-cdk-lib';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda'
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+
+import * as ecrDeployment from 'cdk-ecr-deployment';
 
 import * as applicationRoles from './roles';
 
@@ -203,38 +210,90 @@ export class ApplicationStack extends cdk.Stack {
     });
 
 
-    // Create oncoanalyser resources
-    const pipelineStack = new OncoanalyserStack(this, 'OncoanalyserStack', {
-      ...args,
-      pipelineVersionTag: stackSettings.versionTag,
-      nfBucketName: s3Data.get('nfBucketName')!,
-      nfPrefixTemp: s3Data.get('nfPrefixTemp')!,
-      nfPrefixOutput: s3Data.get('nfPrefixOutput')!,
-      orcabusDataS3BucketName: s3Data.get('orcabusS3BucketName')!,
-      orcabusDataS3ByobPrefix: s3Data.get('orcabusS3ByobPrefix')!,
-      orcabusDataS3PrefixOutput: s3Data.get('orcabusS3PrefixOutput')!,
-      orcabusDataS3PrefixTemp: s3Data.get('orcabusS3PrefixTemp')!,
-      refdataBucketName: s3Data.get('refdataBucketName')!,
-      refdataPrefix: s3Data.get('refdataPrefix')!,
-      ssmParameters: stackSettings.getSsmParameters()
+    // Create Docker image and deploy
+    const dockerStack = new DockerImageBuildStack(this, 'DockerImageBuildStack', {
+      env: props.envBuild,
     });
-    cdk.Tags.of(pipelineStack).add('Stack', 'OncoanalyserStack');
+
+    // Bucket permissions
+    const nfBucket = s3.Bucket.fromBucketName(this, 'S3Bucket',
+      settings.S3_BUCKET_NAME,
+    );
+
+    nfBucket.grantRead(roleBatchInstancePipeline, `${settings.S3_BUCKET_INPUT_PREFIX}/*`);
+    nfBucket.grantRead(roleBatchInstanceTask, `${settings.S3_BUCKET_INPUT_PREFIX}/*`);
+
+    nfBucket.grantRead(roleBatchInstancePipeline, `${settings.S3_BUCKET_REFDATA_PREFIX}/*`);
+    nfBucket.grantRead(roleBatchInstanceTask, `${settings.S3_BUCKET_REFDATA_PREFIX}/*`);
+
+    nfBucket.grantReadWrite(roleBatchInstancePipeline, `${settings.S3_BUCKET_OUTPUT_PREFIX}/*`);
+    nfBucket.grantReadWrite(roleBatchInstanceTask, `${settings.S3_BUCKET_OUTPUT_PREFIX}/*`);
+
+    // Create job definition for pipeline execution
+    const jobDefinition = new batch.EcsJobDefinition(this, 'JobDefinition', {
+      jobDefinitionName: 'oncoanalyser-job-definition',
+      container: new batch.EcsEc2ContainerDefinition(this, 'EcsEc2ContainerDefinition', {
+        cpu: 1,
+        image: dockerStack.image,
+        command: ['true'],
+        memory: cdk.Size.mebibytes(1000),
+        jobRole: stackRoles.pipelineRole,
+      }),
+    });
+
+    // Create Lambda function role
+    const lambdaSubmissionRole = new iam.Role(this, 'LambdaSubmitRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMReadOnlyAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+      ]
+    });
+
+    new iam.Policy(this, 'LambdaBatchPolicy', {
+      roles: [lambdaSubmissionRole],
+      statements: [new iam.PolicyStatement({
+        actions: [
+          'batch:SubmitJob',
+          'batch:TagResource',
+        ],
+        resources: [
+          jobQueueTask.jobQueueArn,
+          jobDefinition.jobDefinitionArn,
+        ],
+      })],
+    });
+
+    // Create Lambda function
+    const aws_lambda_function = new lambda.Function(this, 'LambdaSubmissionFunction', {
+      functionName: 'oncoanalyser-batch-job-submission',
+      handler: 'lambda_code.main',
+      runtime: lambda.Runtime.PYTHON_3_9,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'lambda_functions', 'batch_job_submission')),
+      role: lambdaSubmissionRole
+    });
+
+    // Create SSM parameters
+    new ssm.StringParameter(this, 'SsmParameter-batch_job_definition_arn', {
+      parameterName: '/oncoanalyser_stack/batch_job_definition_arn',
+      stringValue: jobDefinition.jobDefinitionArn,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-batch_instance_task_role_arn', {
+      parameterName: '/oncoanalyser_stack/batch_instance_task_role_arn',
+      stringValue: roleBatchInstanceTask.roleArn,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-batch_instance_task_profile_arn', {
+      parameterName: '/oncoanalyser_stack/batch_instance_task_profile_arn',
+      stringValue: roleBatchInstanceTask.attrArn,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-submission_lambda_arn', {
+      parameterName: '/oncoanalyser_stack/submission_lambda_arn',
+      stringValue: aws_lambda_function.functionArn,
+    });
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   getLaunchTemplateTask(args: {
     securityGroup: ec2.ISecurityGroup,
@@ -319,5 +378,28 @@ export class ApplicationStack extends cdk.Stack {
 
     cdk.Tags.of(launchTemplate).add('Name', 'nextflow-pipeline');
     return launchTemplate;
+  }
+}
+
+
+export class DockerImageBuildStack extends cdk.Stack {
+  public readonly image: ecs.EcrImage;
+
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
+      directory: __dirname,
+    });
+
+    const dockerDestBase = `${props.env.account}.dkr.ecr.${props.env.region}.amazonaws.com`;
+
+    new ecrDeployment.ECRDeployment(this, 'DeployDockerImage', {
+      src: new ecrDeployment.DockerImageName(image.imageUri),
+      dest: new ecrDeployment.DockerImageName(`${dockerDestBase}/oncoanalyser:latest`),
+    });
+
+    const ecrRepository = ecr.Repository.fromRepositoryName(this, 'EcrRespository', 'oncoanalyser');
+    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, dockerTag);
   }
 }
