@@ -1,10 +1,10 @@
 import { Construct } from 'constructs'
 
-import * as fs from 'fs';
 import * as path from 'path';
 
 import * as batch from 'aws-cdk-lib/aws-batch';
 import * as cdk from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -14,12 +14,10 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 
 import * as ecrDeployment from 'cdk-ecr-deployment';
 
-import * as applicationRoles from './roles';
-
 import * as settings from '../settings';
 
 export class ApplicationStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
 
@@ -50,11 +48,11 @@ export class ApplicationStack extends cdk.Stack {
       ],
     });
 
-    const launchTemplateTask = this.getTaskLaunchTemplate({
-      securityGroup: args.securityGroup,
+    const launchTemplateTask = this.getLaunchTemplateTask({
+      securityGroup: securityGroup,
     });
 
-    const instanceTypes = settings.TASK_INSTANCE_TYPES
+    const instanceTypesTask = settings.TASK_INSTANCE_TYPES
       .map((typeStr) => {
         return new ec2.InstanceType(typeStr);
       });
@@ -62,9 +60,9 @@ export class ApplicationStack extends cdk.Stack {
     const computeEnvironmentTask = new batch.ManagedEc2EcsComputeEnvironment(this, 'ComputeEnvironmentTask', {
       allocationStrategy: batch.AllocationStrategy.BEST_FIT,
       instanceRole: roleBatchInstanceTask,
-      instanceTypes: instanceTypes,
+      instanceTypes: instanceTypesTask,
       launchTemplate: launchTemplateTask,
-      maxvCpus: settings.MAX_TASK_CE_VCPUS
+      maxvCpus: settings.MAX_TASK_CE_VCPUS,
       securityGroups: [],
       useOptimalInstanceClasses: false,
       vpc: vpc,
@@ -178,11 +176,11 @@ export class ApplicationStack extends cdk.Stack {
       })],
     });
 
-    const launchTemplatePipeline = this.getPipelineLaunchTemplate({
-      securityGroup: args.securityGroup,
+    const launchTemplatePipeline = this.getLaunchTemplatePipeline({
+      securityGroup: securityGroup,
     });
 
-    const instanceTypes = settings.PIPELINE_INSTANCE_TYPES
+    const instanceTypesPipeline = settings.PIPELINE_INSTANCE_TYPES
       .map((typeStr) => {
         return new ec2.InstanceType(typeStr);
       });
@@ -190,9 +188,9 @@ export class ApplicationStack extends cdk.Stack {
     const computeEnvironmentPipeline = new batch.ManagedEc2EcsComputeEnvironment(this, 'ComputeEnvironmentPipeline', {
       allocationStrategy: batch.AllocationStrategy.BEST_FIT,
       instanceRole: roleBatchInstancePipeline,
-      instanceTypes: instanceTypes,
+      instanceTypes: instanceTypesPipeline,
       launchTemplate: launchTemplatePipeline,
-      maxvCpus: settings.MAX_PIPELINE_CE_VCPUS
+      maxvCpus: settings.MAX_PIPELINE_CE_VCPUS,
       securityGroups: [],
       useOptimalInstanceClasses: false,
       vpc: vpc,
@@ -211,7 +209,7 @@ export class ApplicationStack extends cdk.Stack {
 
     // Create Docker image and deploy
     const dockerStack = new DockerImageBuildStack(this, 'DockerImageBuildStack', {
-      env: props.envBuild,
+      env: props.env,
     });
 
     // Bucket permissions
@@ -236,7 +234,7 @@ export class ApplicationStack extends cdk.Stack {
         image: dockerStack.image,
         command: ['true'],
         memory: cdk.Size.mebibytes(1000),
-        jobRole: stackRoles.pipelineRole,
+        jobRole: roleBatchInstancePipeline,
       }),
     });
 
@@ -352,14 +350,14 @@ export class ApplicationStack extends cdk.Stack {
 export class DockerImageBuildStack extends cdk.Stack {
   public readonly image: ecs.EcrImage;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
     const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
-      directory: __dirname,
+      directory: path.join(__dirname, 'resources'),
     });
 
-    const dockerDestBase = `${props.env.account}.dkr.ecr.${props.env.region}.amazonaws.com`;
+    const dockerDestBase = `${props.env!.account}.dkr.ecr.${props.env!.region}.amazonaws.com`;
 
     new ecrDeployment.ECRDeployment(this, 'DeployDockerImage', {
       src: new ecrDeployment.DockerImageName(image.imageUri),
@@ -367,6 +365,6 @@ export class DockerImageBuildStack extends cdk.Stack {
     });
 
     const ecrRepository = ecr.Repository.fromRepositoryName(this, 'EcrRespository', 'oncoanalyser');
-    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, dockerTag);
+    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, 'latest');
   }
 }
