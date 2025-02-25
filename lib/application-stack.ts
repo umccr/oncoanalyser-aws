@@ -14,7 +14,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 
 import * as ecrDeployment from 'cdk-ecr-deployment';
 
-import * as settings from '../settings';
+import * as settings from './settings';
 
 export class ApplicationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: cdk.StackProps) {
