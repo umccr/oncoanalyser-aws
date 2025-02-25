@@ -42,7 +42,6 @@ export class ApplicationStack extends cdk.Stack {
         new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       ),
       managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
       ],
@@ -176,6 +175,17 @@ export class ApplicationStack extends cdk.Stack {
       })],
     });
 
+    roleBatchInstancePipeline.attachInlinePolicy(
+      new iam.Policy(this, 'PipelinePolicyPassRole', {
+        statements: [
+          new iam.PolicyStatement({
+            actions: ['iam:PassRole'],
+            resources: [roleBatchInstanceTask.roleArn],
+          })
+        ],
+      })
+    );
+
     const launchTemplatePipeline = this.getLaunchTemplatePipeline({
       securityGroup: securityGroup,
     });
@@ -264,29 +274,27 @@ export class ApplicationStack extends cdk.Stack {
     securityGroup: ec2.ISecurityGroup,
   }) {
 
-    const userDataString = `
-      MIME-Version: 1.0
-      Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+    const userData = ec2.UserData.custom(
+`MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==BOUNDARY=="
 
-      --==BOUNDARY==
-      Content-Type: text/x-shellscript; charset="us-ascii"
+--==BOUNDARY==
+Content-Type: text/x-shellscript; charset="us-ascii"
 
-      #!/bin/bash
-      mkdir -p /mnt/local_ephemeral/
-      mkfs.ext4 /dev/nvme1n1
-      mount /dev/nvme1n1 /mnt/local_ephemeral/
-      chmod 777 /mnt/local_ephemeral/
+#!/bin/bash
+mkdir -p /mnt/local_ephemeral/
+mkfs.ext4 /dev/nvme1n1
+mount /dev/nvme1n1 /mnt/local_ephemeral/
+chmod 777 /mnt/local_ephemeral/
 
-      --==BOUNDARY==--
-    `;
+--==BOUNDARY==--`
+    );
 
     const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplateTask', {
       launchTemplateName: 'oncoanalyser-task',
       associatePublicIpAddress: true,
-      userData: ec2.UserData.custom(userDataString),
+      userData: userData,
       securityGroup: args.securityGroup,
-      requireImdsv2: true,
-      httpTokens: ec2.LaunchTemplateHttpTokens.REQUIRED,
     });
 
     cdk.Tags.of(launchTemplate).add('Name', 'nextflow-task');
@@ -297,48 +305,46 @@ export class ApplicationStack extends cdk.Stack {
     securityGroup: ec2.ISecurityGroup,
   }) {
 
-    const userDataString = `
-      MIME-Version: 1.0
-      Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+    const userData = ec2.UserData.custom(
+`MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==BOUNDARY=="
 
-      --==BOUNDARY==
-      Content-Type: text/cloud-config; charset="us-ascii"
+--==BOUNDARY==
+Content-Type: text/cloud-config; charset="us-ascii"
 
-      packages:
-        - btrfs-progs
-        - git
-        - jq
-        - lvm2
-        - sed
-        - unzip
-        - wget
+packages:
+  - btrfs-progs
+  - git
+  - jq
+  - lvm2
+  - sed
+  - unzip
+  - wget
 
-      --==BOUNDARY==
-      Content-Type: text/x-shellscript; charset="us-ascii"
+--==BOUNDARY==
+Content-Type: text/x-shellscript; charset="us-ascii"
 
-      #!/bin/bash
-      curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
-      unzip -q /tmp/awscliv2.zip -d /tmp/
+#!/bin/bash
+curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp/
 
-      /tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
-      ln -s /opt/awscliv2/bin/aws /usr/local/bin/
+/tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
+ln -s /opt/awscliv2/bin/aws /usr/local/bin/
 
-      git clone https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
-      (cd /tmp/amazon-ebs-autoscale/ && git checkout 6db0c70)
+git clone https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
+(cd /tmp/amazon-ebs-autoscale/ && git checkout 6db0c70)
 
-      bash /tmp/amazon-ebs-autoscale/install.sh --imdsv2
+bash /tmp/amazon-ebs-autoscale/install.sh
 
-      rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
-      --==BOUNDARY==--
-    `;
+rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
+--==BOUNDARY==--`
+    );
 
     const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplatePipeline', {
       launchTemplateName: 'oncoanalyser-pipeline',
       associatePublicIpAddress: true,
-      userData: ec2.UserData.custom(userDataString),
+      userData: userData,
       securityGroup: args.securityGroup,
-      requireImdsv2: true,
-      httpTokens: ec2.LaunchTemplateHttpTokens.REQUIRED,
     });
 
     cdk.Tags.of(launchTemplate).add('Name', 'nextflow-pipeline');
