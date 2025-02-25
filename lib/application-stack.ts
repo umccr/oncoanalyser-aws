@@ -9,7 +9,6 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecrAssets from 'aws-cdk-lib/aws-ecr-assets';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 
@@ -241,47 +240,10 @@ export class ApplicationStack extends cdk.Stack {
       }),
     });
 
-    // Create Lambda function role
-    const lambdaSubmissionRole = new iam.Role(this, 'LambdaSubmitRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMReadOnlyAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
-      ]
-    });
-
-    new iam.Policy(this, 'LambdaBatchPolicy', {
-      roles: [lambdaSubmissionRole],
-      statements: [new iam.PolicyStatement({
-        actions: [
-          'batch:SubmitJob',
-          'batch:TagResource',
-        ],
-        resources: [
-          jobQueueTask.jobQueueArn,
-          jobDefinition.jobDefinitionArn,
-        ],
-      })],
-    });
-
-    // Create Lambda function
-    const aws_lambda_function = new lambda.Function(this, 'LambdaSubmissionFunction', {
-      functionName: 'oncoanalyser-batch-job-submission',
-      handler: 'lambda_code.main',
-      runtime: lambda.Runtime.PYTHON_3_9,
-      code: lambda.Code.fromAsset(path.join(__dirname, 'lambda_functions', 'batch_job_submission')),
-      role: lambdaSubmissionRole
-    });
-
     // Create SSM parameters
     new ssm.StringParameter(this, 'SsmParameter-batch_job_queue_name', {
       parameterName: '/oncoanalyser_stack/batch_job_queue_name',
       stringValue: jobQueueTask.jobQueueName,
-    });
-
-    new ssm.StringParameter(this, 'SsmParameter-batch_job_definition_arn', {
-      parameterName: '/oncoanalyser_stack/batch_job_definition_arn',
-      stringValue: jobDefinition.jobDefinitionArn,
     });
 
     new ssm.StringParameter(this, 'SsmParameter-batch_instance_task_role_arn', {
@@ -289,29 +251,9 @@ export class ApplicationStack extends cdk.Stack {
       stringValue: roleBatchInstanceTask.roleArn,
     });
 
-    new ssm.StringParameter(this, 'SsmParameter-batch_instance_task_profile_arn', {
-      parameterName: '/oncoanalyser_stack/batch_instance_task_profile_arn',
-      stringValue: roleBatchInstanceTask.attrArn,
-    });
-
-    new ssm.StringParameter(this, 'SsmParameter-submission_lambda_arn', {
-      parameterName: '/oncoanalyser_stack/submission_lambda_arn',
-      stringValue: aws_lambda_function.functionArn,
-    });
-
     new ssm.StringParameter(this, 'SsmParameter-s3_bucket_name', {
       parameterName: '/oncoanalyser_stack/s3_bucket_name',
       stringValue: settings.S3_BUCKET_NAME,
-    });
-
-    new ssm.StringParameter(this, 'SsmParameter-s3_input_prefix', {
-      parameterName: '/oncoanalyser_stack/s3_input_prefix',
-      stringValue: settings.S3_BUCKET_INPUT_PREFIX,
-    });
-
-    new ssm.StringParameter(this, 'SsmParameter-s3_output_prefix', {
-      parameterName: '/oncoanalyser_stack/s3_output_prefix',
-      stringValue: settings.S3_BUCKET_OUTPUT_PREFIX,
     });
 
     new ssm.StringParameter(this, 'SsmParameter-s3_refdata_prefix', {

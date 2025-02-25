@@ -47,9 +47,10 @@ sed \
   --regexp-extended \
   --expression \
     "
-      s#__S3_GENOMES_DATA_PATH__#s3://$(get_genomes_path_from_ssm)#g;
-      s#__BATCH_INSTANCE_ROLE__#$(get_batch_instance_role_arn_from_ssm)#g;
-      s#__PORTAL_RUN_ID__#${portal_run_id}#g;
+      s#__BATCH_INSTANCE_ROLE__#$(get_ssm_parameter_value /oncoanalyser_stack/batch_instance_task_role_arn)#g;
+      s#__S3_BUCKET_NAME__#$(get_ssm_parameter_value /oncoanalyser_stack/s3_bucket_name)#g;
+      s#__S3_BUCKET_REFDATA_PREFIX__#$(get_ssm_parameter_value /oncoanalyser_stack/s3_refdata_prefix)#g;
+      s#__BATCH_JOB_QUEUE_NAME__#$(get_ssm_parameter_value /oncoanalyser_stack/batch_job_queue_name)#g;
     " \
   /root/pipeline/other/nextflow_aws.template.config > aws.config
 
