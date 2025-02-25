@@ -4,7 +4,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 
-export function createPipelineRoles(args: { context: cdk.Stack, workflowName: string, jobQueueArns: string[] }) {
+export function createPipelineRoles(args: { context: cdk.Stack, workflowName: string, jobQueueArn: string }) {
     // Task and pipeline role
     const roleBatchInstanceTask = getRoleBatchInstanceTask(args);
     const roleBatchInstancePipeline = getBaseBatchInstancePipelineRole(args);
@@ -108,7 +108,7 @@ export function getRoleBatchInstanceTask(args: { context: cdk.Stack, workflowNam
 }
 
 
-export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, workflowName: string, jobQueueArns: string[] }) {
+export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, workflowName: string, jobQueueArn: string }) {
 
   const rolePipeline = new iam.Role(args.context, `PipelineBatchInstanceRole-${args.workflowName}`, {
     roleName: `nextflow-${args.workflowName}-pipeline-batch-instance-role`,
@@ -137,7 +137,7 @@ export function getBaseBatchInstancePipelineRole(args: { context: cdk.Stack, wor
       ],
 
       resources: [
-        ...args.jobQueueArns,
+        args.jobQueueArn,
         `arn:aws:batch:${args.context.region}:${args.context.account}:job-definition/nf-*`
       ],
     })],
