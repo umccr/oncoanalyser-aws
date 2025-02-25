@@ -17,11 +17,8 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
-ARG PIPELINE_GITHUB_REF="pipeline_v6.0"
-ARG PIPELINE_GITHUB_REPO_URL="https://github.com/nf-core/oncoanalyser"
-
-RUN \
-  test -n "${PIPELINE_GITHUB_REF}" || (echo "PIPELINE_GITHUB_REF must be set" && false)
+ARG ONCOANALYSER_GIT_REF="pipeline_v6.0"
+ARG ONCOANALYSER_GIT_URL="https://github.com/nf-core/oncoanalyser"
 
 # Configure Conda
 RUN \
@@ -90,10 +87,10 @@ RUN \
 # Install pipeline software and config
 RUN \
   mkdir --parents "/root/pipeline/software/" && \
-  git clone -b ${ONCOANALYSER_GIT_REF} ${ONCOANALYSER_GIT_URL} software/oncoanalyser/ && \
+  git clone -b ${ONCOANALYSER_GIT_REF} ${ONCOANALYSER_GIT_URL} software/oncoanalyser/
 
 RUN \
-  mkdir --parents "/root/pipeline/other/" && \
+  mkdir --parents "/root/pipeline/other/"
 
 COPY nextflow_aws.template.config /root/pipeline/other/
 COPY run.sh /root/pipeline/other/

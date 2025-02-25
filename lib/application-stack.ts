@@ -361,10 +361,10 @@ export class DockerImageBuildStack extends cdk.Stack {
 
     new ecrDeployment.ECRDeployment(this, 'DeployDockerImage', {
       src: new ecrDeployment.DockerImageName(image.imageUri),
-      dest: new ecrDeployment.DockerImageName(`${dockerDestBase}/oncoanalyser:latest`),
+      dest: new ecrDeployment.DockerImageName(`${dockerDestBase}/${settings.ECR_REPO}:${settings.DOCKER_IMAGE_TAG}`),
     });
 
-    const ecrRepository = ecr.Repository.fromRepositoryName(this, 'EcrRespository', 'oncoanalyser');
-    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, 'latest');
+    const ecrRepository = ecr.Repository.fromRepositoryName(this, 'EcrRespository', settings.ECR_REPO);
+    this.image = ecs.EcrImage.fromEcrRepository(ecrRepository, settings.DOCKER_IMAGE_TAG);
   }
 }
