@@ -274,6 +274,11 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     // Create SSM parameters
+    new ssm.StringParameter(this, 'SsmParameter-batch_job_queue_name', {
+      parameterName: '/oncoanalyser_stack/batch_job_queue_name',
+      stringValue: jobQueueTask.jobQueueName,
+    });
+
     new ssm.StringParameter(this, 'SsmParameter-batch_job_definition_arn', {
       parameterName: '/oncoanalyser_stack/batch_job_definition_arn',
       stringValue: jobDefinition.jobDefinitionArn,
@@ -292,6 +297,26 @@ export class ApplicationStack extends cdk.Stack {
     new ssm.StringParameter(this, 'SsmParameter-submission_lambda_arn', {
       parameterName: '/oncoanalyser_stack/submission_lambda_arn',
       stringValue: aws_lambda_function.functionArn,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-s3_bucket_name', {
+      parameterName: '/oncoanalyser_stack/s3_bucket_name',
+      stringValue: settings.S3_BUCKET_NAME,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-s3_input_prefix', {
+      parameterName: '/oncoanalyser_stack/s3_input_prefix',
+      stringValue: settings.S3_BUCKET_INPUT_PREFIX,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-s3_output_prefix', {
+      parameterName: '/oncoanalyser_stack/s3_output_prefix',
+      stringValue: settings.S3_BUCKET_OUTPUT_PREFIX,
+    });
+
+    new ssm.StringParameter(this, 'SsmParameter-s3_refdata_prefix', {
+      parameterName: '/oncoanalyser_stack/s3_refdata_prefix',
+      stringValue: settings.S3_BUCKET_REFDATA_PREFIX,
     });
   }
 

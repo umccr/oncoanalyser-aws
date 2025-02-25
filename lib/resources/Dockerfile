@@ -17,7 +17,7 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
-ARG PIPELINE_GITHUB_REF='"ipeline_v6.0"
+ARG PIPELINE_GITHUB_REF='"pipeline_v6.0"
 ARG PIPELINE_GITHUB_REPO_URL="https://github.com/nf-core/oncoanalyser"
 
 RUN \
@@ -90,18 +90,15 @@ RUN \
 # Install pipeline software and config
 RUN \
   mkdir --parents "/root/pipeline/software/" && \
-  mkdir --parents "/root/pipeline/assets/" && \
-  ( \
-    cd "/root/pipeline/software/" && \
-    git clone "${PIPELINE_GITHUB_REPO_URL}" oncoanalyser/ && \
-    cd oncoanalyser && \
-    git checkout ${PIPELINE_GITHUB_REF} \
-  )
-
-COPY nextflow_aws.template.config /root/pipeline/assets/
-COPY run.sh /root/pipeline/assets/
+  git clone -b ${ONCOANALYSER_GIT_REF} ${ONCOANALYSER_GIT_URL} software/oncoanalyser/ && \
 
 RUN \
-  chmod +x "/root/pipeline/assets/run.sh"
+  mkdir --parents "/root/pipeline/other/" && \
+
+COPY nextflow_aws.template.config /root/pipeline/other/
+COPY run.sh /root/pipeline/other/
+
+RUN \
+  chmod +x "/root/pipeline/other/run.sh"
 
 WORKDIR /root/pipeline/
