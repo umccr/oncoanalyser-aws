@@ -299,6 +299,23 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
+    const baseImage = "quay.io/biocontainers/fastp:0.23.4--hadf994f_2";
+
+    const fastpImageAsset = new ecrAssets.DockerImageAsset(this, 'FastpImageAsset', {
+      directory: path.join(__dirname, 'process_docker_images'),
+      platform: Platform.LINUX_AMD64,
+      // because the image base name is passed into Docker - the actual Docker checksum
+      // itself won't change even when the image base does... so we need to add it into the hash
+      extraHash: baseImage,
+      buildArgs: {
+        // pass this through to Docker forming the base of the image we are constructing
+        BASE_IMAGE: baseImage,
+      }
+    });
+
+
+
+
     const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
 
     const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
@@ -308,7 +325,8 @@ export class Oncoanalyser extends Construct {
       BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
       S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
-      BATCH_VOLUME_MOUNT_POINT: BATCH_VOLUME_MOUNT_POINT
+      BATCH_VOLUME_MOUNT_POINT: BATCH_VOLUME_MOUNT_POINT,
+      FASTP_DOCKER_IMAGE_URI: fastpImageAsset.imageUri
     }, { });
 
     // Create job definition for pipeline execution
