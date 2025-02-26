@@ -47,7 +47,7 @@ export class ApplicationStack extends cdk.Stack {
       ],
     });
 
-    const launchTemplateTask = this.getLaunchTemplateTask({
+    const launchTemplateTask = this.getLaunchTemplate({
       securityGroup: securityGroup,
     });
 
@@ -60,7 +60,7 @@ export class ApplicationStack extends cdk.Stack {
       allocationStrategy: batch.AllocationStrategy.BEST_FIT,
       instanceRole: roleBatchInstanceTask,
       instanceTypes: instanceTypesTask,
-      launchTemplate: launchTemplateTask,
+      launchTemplate: launchTemplate,
       maxvCpus: settings.MAX_TASK_CE_VCPUS,
       securityGroups: [],
       useOptimalInstanceClasses: false,
@@ -186,7 +186,7 @@ export class ApplicationStack extends cdk.Stack {
       })
     );
 
-    const launchTemplatePipeline = this.getLaunchTemplatePipeline({
+    const launchTemplate = this.getLaunchTemplate({
       securityGroup: securityGroup,
     });
 
@@ -199,7 +199,7 @@ export class ApplicationStack extends cdk.Stack {
       allocationStrategy: batch.AllocationStrategy.BEST_FIT,
       instanceRole: roleBatchInstancePipeline,
       instanceTypes: instanceTypesPipeline,
-      launchTemplate: launchTemplatePipeline,
+      launchTemplate: launchTemplate,
       maxvCpus: settings.MAX_PIPELINE_CE_VCPUS,
       securityGroups: [],
       useOptimalInstanceClasses: false,
@@ -270,38 +270,7 @@ export class ApplicationStack extends cdk.Stack {
     });
   }
 
-  getLaunchTemplateTask(args: {
-    securityGroup: ec2.ISecurityGroup,
-  }) {
-
-    const userData = ec2.UserData.custom(
-`MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="==BOUNDARY=="
-
---==BOUNDARY==
-Content-Type: text/x-shellscript; charset="us-ascii"
-
-#!/bin/bash
-mkdir -p /mnt/local_ephemeral/
-mkfs.ext4 /dev/nvme1n1
-mount /dev/nvme1n1 /mnt/local_ephemeral/
-chmod 777 /mnt/local_ephemeral/
-
---==BOUNDARY==--`
-    );
-
-    const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplateTask', {
-      launchTemplateName: 'oncoanalyser-task',
-      associatePublicIpAddress: true,
-      userData: userData,
-      securityGroup: args.securityGroup,
-    });
-
-    cdk.Tags.of(launchTemplate).add('Name', 'nextflow-task');
-    return launchTemplate;
-  }
-
-  getLaunchTemplatePipeline(args: {
+  getLaunchTemplate(args: {
     securityGroup: ec2.ISecurityGroup,
   }) {
 
@@ -340,14 +309,14 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
 --==BOUNDARY==--`
     );
 
-    const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplatePipeline', {
+    const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateName: 'oncoanalyser-pipeline',
       associatePublicIpAddress: true,
       userData: userData,
       securityGroup: args.securityGroup,
     });
 
-    cdk.Tags.of(launchTemplate).add('Name', 'nextflow-pipeline');
+    cdk.Tags.of(launchTemplate).add('Name', 'nextflow');
     return launchTemplate;
   }
 }
