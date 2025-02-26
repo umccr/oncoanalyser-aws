@@ -125,7 +125,7 @@ export class Oncoanalyser extends Construct {
         allocationStrategy: batch.AllocationStrategy.BEST_FIT,
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
-        launchTemplate: launchTemplateTask,
+        launchTemplate: launchTemplate,
         maxvCpus: props.maxTaskCpus,
         securityGroups: [],
         useOptimalInstanceClasses: false,
@@ -267,6 +267,10 @@ export class Oncoanalyser extends Construct {
       }),
     );
 
+    const launchTemplate = this.getLaunchTemplate({
+      securityGroup: securityGroup,
+    });
+
     const computeEnvironmentPipeline =
       new batch.ManagedEc2EcsComputeEnvironment(
         this,
@@ -275,7 +279,7 @@ export class Oncoanalyser extends Construct {
           allocationStrategy: batch.AllocationStrategy.BEST_FIT,
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
-          launchTemplate: launchTemplatePipeline,
+          launchTemplate: launchTemplate,
           maxvCpus: props.maxPipelineCpus,
           securityGroups: [],
           useOptimalInstanceClasses: false,
@@ -365,7 +369,6 @@ export class Oncoanalyser extends Construct {
   getLaunchTemplate(args: {
     securityGroup: ec2.ISecurityGroup,
   }) {
-
     const userData = ec2.UserData.custom(
       `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==BOUNDARY=="
@@ -412,7 +415,7 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
       },
     );
 
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow-pipeline");
+    cdk.Tags.of(launchTemplate).add("Name", "nextflow");
     return launchTemplate;
   }
 }
