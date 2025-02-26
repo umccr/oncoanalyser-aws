@@ -283,10 +283,6 @@ export class Oncoanalyser extends Construct {
       }),
     );
 
-    const launchTemplate = this.getLaunchTemplate({
-      securityGroup: securityGroup,
-    });
-
     const computeEnvironmentPipeline =
       new batch.ManagedEc2EcsComputeEnvironment(
         this,
