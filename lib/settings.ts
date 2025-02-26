@@ -10,10 +10,11 @@ export const S3_BUCKET_OUTPUT_PREFIX = 'outputs';
 export const S3_BUCKET_REFDATA_PREFIX = 'refdata';
 
 export const PIPELINE_INSTANCE_TYPES = ['r6a.large'];
-export const TASK_INSTANCE_TYPES = ['r6id.large'];
+export const TASK_INSTANCE_TYPES = ['r6id.xlarge'];
 
 export const ECR_REPO = 'oncoanalyser';
 export const DOCKER_IMAGE_TAG = 'latest-pmcc';
 
-export const MAX_PIPELINE_CE_VCPUS = 64;
-export const MAX_TASK_CE_VCPUS = 256;
+// NOTE(SW): to be used in dev only
+export const MAX_PIPELINE_CE_VCPUS = 2;
+export const MAX_TASK_CE_VCPUS = 4;
