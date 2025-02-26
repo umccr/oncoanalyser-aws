@@ -39,7 +39,7 @@ export type OncoanalyserProps = {
 };
 
 const processImages = {
-  fastp: ""
+  fastp: "quay.io/biocontainers/fastp:0.23.4--hadf994f_2"
 }
 
 export class Oncoanalyser extends Construct {
@@ -303,35 +303,71 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
-    const baseImage = "quay.io/biocontainers/fastp:0.23.4--hadf994f_2";
+    const createProcessImageAsset = (env: any, envName: string, cdkId: string, imageName: string) => {
+      const imageAsset = new ecrAssets.DockerImageAsset(this, cdkId, {
+        directory: path.join(__dirname, 'process_docker_images'),
+        platform: Platform.LINUX_AMD64,
+        // because the image base name is passed into Docker - the actual Docker checksum
+        // itself won't change even when the image base does... so we need to add it into the hash
+        extraHash: imageName,
+        buildArgs: {
+          // pass this through to Docker forming the base of the image we are constructing
+          BASE_IMAGE: imageName,
+        }
+      });
 
-    const fastpImageAsset = new ecrAssets.DockerImageAsset(this, 'FastpImageAsset', {
-      directory: path.join(__dirname, 'process_docker_images'),
-      platform: Platform.LINUX_AMD64,
-      // because the image base name is passed into Docker - the actual Docker checksum
-      // itself won't change even when the image base does... so we need to add it into the hash
-      extraHash: baseImage,
-      buildArgs: {
-        // pass this through to Docker forming the base of the image we are constructing
-        BASE_IMAGE: baseImage,
-      }
-    });
+      env[envName] = imageAsset.imageUri;
+    }
 
-
-
-
-    const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
-
-    const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
-
-    const nextflowConfig = nextflowConfigTemplateCompiled({
+    const env: Record<string,string> = {
       BATCH_INSTANCE_TASK_ROLE_ARN: roleBatchInstanceTask.roleArn,
       BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
       S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
       BATCH_VOLUME_MOUNT_POINT: BATCH_VOLUME_MOUNT_POINT,
-      FASTP_DOCKER_IMAGE_URI: fastpImageAsset.imageUri
-    }, { });
+    };
+
+      // modules/local/neo/annotate_fusions/main.nf:                   'biocontainers/hmftools-isofox:1.7.1--hdfd78af_1'
+    // modules/local/neo/scorer/main.nf:                             'biocontainers/hmftools-neo:1.2--hdfd78af_1'
+    // modules/local/neo/finder/main.nf:                             'biocontainers/hmftools-neo:1.2--hdfd78af_1'
+    // modules/local/bamtools/main.nf:                               'biocontainers/hmftools-bam-tools:1.3--hdfd78af_0'
+    // modules/local/linxreport/main.nf:                             'biocontainers/r-linxreport:1.0.0--r43hdfd78af_0'
+    // modules/local/pave/germline/main.nf:                          'biocontainers/hmftools-pave:1.7--hdfd78af_0'
+    // modules/local/pave/somatic/main.nf:                           'biocontainers/hmftools-pave:1.7--hdfd78af_0'
+    // modules/local/esvee/prep/main.nf:                             'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
+    // modules/local/esvee/assemble/main.nf:                         'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
+    // modules/local/esvee/depth_annotator/main.nf:                  'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
+    // modules/local/esvee/call/main.nf:                             'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
+    // modules/local/sambamba/merge/main.nf:                         'biocontainers/sambamba:1.0.1--h6f6fda4_0'
+
+    createProcessImageAsset(env, "COBALT_DOCKER_IMAGE_URI", "CobaltImageAsset", "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0")
+    createProcessImageAsset(env, "LINX_DOCKER_IMAGE_URI", "LinxImageAsset", "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0")
+    createProcessImageAsset(env, "ISOFOX_DOCKER_IMAGE_URI", "IsofoxImageAsset", "quay.io/biocontainers/hmftools-isofox:1.7.1--hdfd78af_1")
+    createProcessImageAsset(env, "AMBER_DOCKER_IMAGE_URI", "AmberImageAsset", "quay.io/biocontainers/hmftools-amber:4.1.1--hdfd78af_0")
+    createProcessImageAsset(env, "LILAC_DOCKER_IMAGE_URI", "LilacImageAsset", "quay.io/biocontainers/hmftools-lilac:1.6--hdfd78af_1")
+    createProcessImageAsset(env, "STAR_DOCKER_IMAGE_URI", "StarImageAsset", "quay.io/biocontainers/star:2.7.3a--0")
+    createProcessImageAsset(env, "PURPLE_DOCKER_IMAGE_URI", "PurpleImageAsset", "quay.io/biocontainers/hmftools-purple:4.1--hdfd78af_0")
+    createProcessImageAsset(env, "VIRUSBREAKEND_DOCKER_IMAGE_URI", "VirusBreakendImageAsset", "quay.io/nf-core/gridss:2.13.2--1")
+    createProcessImageAsset(env, "GRIDSS_DOCKER_IMAGE_URI", "GridssImageAsset", "quay.io/biocontainers/gridss:2.13.2--h50ea8bc_3")
+    createProcessImageAsset(env, "CHORD_DOCKER_IMAGE_URI", "ChordImageAsset", "quay.io/biocontainers/hmftools-chord:2.1.0--hdfd78af_0")
+    // modules/local/custom/lilac_extract_and_index_contig/main.nf:  'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
+    // modules/local/custom/lilac_realign_reads_lilac/main.nf:       'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
+    // modules/local/custom/lilac_slice/main.nf:                     'biocontainers/samtools:1.19.2--h50ea8bc_0'
+    // modules/local/bwa-mem2/mem/main.nf:                           'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
+    createProcessImageAsset(env, "REDUX_DOCKER_IMAGE_URI", "ReduxImageAsset", "quay.io/biocontainers/hmftools-redux:1.1--hdfd78af_1")
+    createProcessImageAsset(env, "VIRUSINTERPRETER_DOCKER_IMAGE_URI", "VirusInterpreterImageAsset", "quay.io/biocontainers/hmftools-virus-interpreter:1.7--hdfd78af_0")
+    createProcessImageAsset(env, "SAGE_DOCKER_IMAGE_URI", "SageImageAsset", "quay.io/biocontainers/hmftools-sage:4.0--hdfd78af_0")
+    createProcessImageAsset(env, "CUPPA_DOCKER_IMAGE_URI", "CuppaImageAsset", "quay.io/biocontainers/hmftools-cuppa:2.3.1--py311r42hdfd78af_0")
+    createProcessImageAsset(env, "ORANGE_DOCKER_IMAGE_URI", "OrangeImageAsset", "quay.io/biocontainers/hmftools-orange:3.7.1--hdfd78af_0")
+    createProcessImageAsset(env, "FASTP_DOCKER_IMAGE_URI", "FastpImageAsset", "quay.io/biocontainers/fastp:0.23.4--hadf994f_2")
+    createProcessImageAsset(env, "SIGS_DOCKER_IMAGE_URI", "SigsImageAsset", "quay.io/biocontainers/hmftools-sigs:1.2.1--hdfd78af_1")
+
+    const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
+    const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
+    const nextflowConfig = nextflowConfigTemplateCompiled(env, { });
+
+    if (nextflowConfig.includes("DOCKER_IMAGE_URI"))
+      throw new Error("a docker image substitution was missed in the nextflow config presumably because of a simple name mismatch");
 
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
