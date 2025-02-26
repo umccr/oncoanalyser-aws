@@ -265,6 +265,7 @@ export class Oncoanalyser extends Construct {
     // Create Docker image and deploy
     const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
       directory: path.join(__dirname, 'resources'),
+      platform: Platform.LINUX_AMD64
     });
 
     // Bucket permissions
