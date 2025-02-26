@@ -17,12 +17,8 @@ ARG DOCKER_CE_VERSION="23.0.1-1"
 ARG DOCKER_COMPOSE_VERSION="2.16.0-1"
 
 # Pipeline GH URL and branch/tag
-# NOTE(SW): PIPELINE_GITHUB_REF must be provided as build argument
-ARG PIPELINE_GITHUB_REF
-ARG PIPELINE_GITHUB_REPO_URL="https://github.com/nf-core/oncoanalyser"
-
-RUN \
-  test -n "${PIPELINE_GITHUB_REF}" || (echo "PIPELINE_GITHUB_REF must be set" && false)
+ARG ONCOANALYSER_GIT_REF="pipeline_v6.0"
+ARG ONCOANALYSER_GIT_URL="https://github.com/nf-core/oncoanalyser"
 
 # Configure Conda
 RUN \
@@ -91,20 +87,15 @@ RUN \
 # Install pipeline software and config
 RUN \
   mkdir --parents "/root/pipeline/software/" && \
-  mkdir --parents "/root/pipeline/assets/" && \
-  ( \
-    cd "/root/pipeline/software/" && \
-    git clone "${PIPELINE_GITHUB_REPO_URL}" oncoanalyser/ && \
-    cd oncoanalyser && \
-    git checkout ${PIPELINE_GITHUB_REF} \
-  )
-
-COPY assets/nextflow_aws.template.config /root/pipeline/assets/
-COPY assets/run.sh /root/pipeline/assets/
-COPY assets/run-v2.sh /root/pipeline/assets/
+  git clone -b ${ONCOANALYSER_GIT_REF} ${ONCOANALYSER_GIT_URL} software/oncoanalyser/
 
 RUN \
-  chmod +x "/root/pipeline/assets/run.sh" && \
-  chmod +x "/root/pipeline/assets/run-v2.sh"
+  mkdir --parents "/root/pipeline/other/"
+
+COPY nextflow_aws.template.config /root/pipeline/other/
+COPY run.sh /root/pipeline/other/
+
+RUN \
+  chmod +x "/root/pipeline/other/run.sh"
 
 WORKDIR /root/pipeline/
