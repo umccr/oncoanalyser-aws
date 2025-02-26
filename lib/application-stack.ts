@@ -47,6 +47,22 @@ export class ApplicationStack extends cdk.Stack {
       ],
     });
 
+    new iam.Policy(this, 'TaskEbsAutoscalePolicy', {
+      roles: [roleBatchInstanceTask],
+      statements: [new iam.PolicyStatement({
+        actions: [
+          'ec2:CreateVolume',
+          'ec2:AttachVolume',
+          'ec2:DeleteVolume',
+          'ec2:DescribeVolumes',
+          'ec2:DescribeVolumeStatus',
+          'ec2:ModifyInstanceAttribute',
+          'ec2:CreateTags'
+        ],
+        resources: ['*']
+      })],
+    });
+
     const launchTemplateTask = this.getLaunchTemplate({
       securityGroup: securityGroup,
     });
