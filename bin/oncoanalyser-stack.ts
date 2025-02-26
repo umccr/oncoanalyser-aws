@@ -1,15 +1,30 @@
 #!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib';
+import * as cdk from "aws-cdk-lib";
 
-import * as settings from '../lib/settings';
-import * as stack from '../lib/application-stack';
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { Construct } from "constructs";
+import { Oncoanalyser, OncoanalyserProps } from "../lib/application-stack";
+import {SETTINGS} from "./settings";
 
-const app = new cdk.App()
-const oncoanalyserStack = new stack.ApplicationStack(app, 'OncoanalyserStack', {
+export class OncoanalyserStack extends cdk.Stack {
+  constructor(
+    scope: Construct,
+    id: string,
+    settings: cdk.StackProps & OncoanalyserProps,
+  ) {
+    super(scope, id, settings);
+
+    new Oncoanalyser(this, "Oncoanalyser", settings);
+  }
+}
+
+const app = new cdk.App();
+const oncoanalyserStack = new OncoanalyserStack(app, "OncoanalyserStack", {
   env: {
-    account: settings.AWS_ACCOUNT,
-    region: settings.AWS_REGION,
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION,
   },
+  ...SETTINGS,
 });
 
-cdk.Tags.of(oncoanalyserStack).add('Stack', 'OncoanalyserStack');
+cdk.Tags.of(oncoanalyserStack).add("Stack", "OncoanalyserStack");
