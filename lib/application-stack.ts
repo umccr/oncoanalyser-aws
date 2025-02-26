@@ -63,7 +63,7 @@ export class ApplicationStack extends cdk.Stack {
       })],
     });
 
-    const launchTemplateTask = this.getLaunchTemplate({
+    const launchTemplate = this.getLaunchTemplate({
       securityGroup: securityGroup,
     });
 
@@ -201,10 +201,6 @@ export class ApplicationStack extends cdk.Stack {
         ],
       })
     );
-
-    const launchTemplate = this.getLaunchTemplate({
-      securityGroup: securityGroup,
-    });
 
     const instanceTypesPipeline = settings.PIPELINE_INSTANCE_TYPES
       .map((typeStr) => {
