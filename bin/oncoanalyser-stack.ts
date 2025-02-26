@@ -3,7 +3,8 @@ import * as cdk from "aws-cdk-lib";
 
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
-import { Oncoanalyser, OncoanalyserProps } from "../lib/oncoanalyser";
+import { Oncoanalyser, OncoanalyserProps } from "../lib/application-stack";
+import {SETTINGS} from "./settings";
 
 export class OncoanalyserStack extends cdk.Stack {
   constructor(
@@ -23,25 +24,7 @@ const oncoanalyserStack = new OncoanalyserStack(app, "OncoanalyserStack", {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,
   },
-  bucket: {
-    bucket: "umccr-temp-dev",
-    inputPrefix: "inputs",
-    outputPrefix: "outputs",
-    refDataPrefix: "refdata",
-  },
-  docker: {
-    ecrRepo: "oncoanalyser",
-    dockerImageTag: "latest-pmcc",
-  },
-  maxPipelineCpus: 64,
-  maxTaskCpus: 256,
-  pipelineInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
-  ],
-  taskInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6ID, ec2.InstanceSize.LARGE),
-  ],
-  vpc: undefined,
+  ...SETTINGS,
 });
 
 cdk.Tags.of(oncoanalyserStack).add("Stack", "OncoanalyserStack");
