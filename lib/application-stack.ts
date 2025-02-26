@@ -1,6 +1,7 @@
 import { Construct } from "constructs";
 
 import * as path from "path";
+import * as fs from "fs";
 
 import * as batch from "aws-cdk-lib/aws-batch";
 import * as cdk from "aws-cdk-lib";
@@ -12,8 +13,13 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
+import * as Handlebars from "handlebars";
 import * as ecrDeployment from "cdk-ecr-deployment";
 import { Aws } from "aws-cdk-lib";
+import {ContainerImage} from "aws-cdk-lib/aws-ecs";
+import {Platform} from "aws-cdk-lib/aws-ecr-assets";
+
+const BATCH_VOLUME_MOUNT_POINT = "/mnt/local_ephemeral/"
 
 export type BucketProps = {
   bucket: string;
@@ -288,11 +294,10 @@ export class Oncoanalyser extends Construct {
     });
 
     // Create Docker image and deploy
-    const docker = new DockerImageBuild(
-      this,
-      "DockerImageBuildStack",
-      props.docker,
-    );
+    const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
+      directory: path.join(__dirname, 'resources'),
+      platform: Platform.LINUX_AMD64
+    });
 
     // Bucket permissions
     const nfBucket = s3.Bucket.fromBucketName(
@@ -325,6 +330,18 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
+    const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
+
+    const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
+
+    const nextflowConfig = nextflowConfigTemplateCompiled({
+      BATCH_INSTANCE_TASK_ROLE_ARN: roleBatchInstanceTask.roleArn,
+      BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
+      S3_BUCKET_NAME: props.bucket.bucket,
+      S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
+      BATCH_VOLUME_MOUNT_POINT: BATCH_VOLUME_MOUNT_POINT
+    }, { });
+
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
       jobDefinitionName: "oncoanalyser-job-definition",
@@ -333,33 +350,15 @@ export class Oncoanalyser extends Construct {
         "EcsEc2ContainerDefinition",
         {
           cpu: 1,
-          image: docker.image,
+          image: ContainerImage.fromDockerImageAsset(image),
           command: ["true"],
           memory: cdk.Size.mebibytes(1000),
           jobRole: roleBatchInstancePipeline,
+          environment: {
+            ONCOANALYSER_NEXTFLOW_CONFIG_BASE64: Buffer.from(nextflowConfig).toString('base64')
+          }
         },
       ),
-    });
-
-    // Create SSM parameters
-    new ssm.StringParameter(this, "SsmParameter-batch_job_queue_name", {
-      parameterName: "/oncoanalyser_stack/batch_job_queue_name",
-      stringValue: jobQueueTask.jobQueueName,
-    });
-
-    new ssm.StringParameter(this, "SsmParameter-batch_instance_task_role_arn", {
-      parameterName: "/oncoanalyser_stack/batch_instance_task_role_arn",
-      stringValue: roleBatchInstanceTask.roleArn,
-    });
-
-    new ssm.StringParameter(this, "SsmParameter-s3_bucket_name", {
-      parameterName: "/oncoanalyser_stack/s3_bucket_name",
-      stringValue: props.bucket.bucket,
-    });
-
-    new ssm.StringParameter(this, "SsmParameter-s3_refdata_prefix", {
-      parameterName: "/oncoanalyser_stack/s3_refdata_prefix",
-      stringValue: props.bucket.refDataPrefix,
     });
   }
 
