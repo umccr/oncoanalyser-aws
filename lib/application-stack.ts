@@ -38,6 +38,10 @@ export type OncoanalyserProps = {
   docker: DockerImageBuildProps;
 };
 
+const processImages = {
+  fastp: ""
+}
+
 export class Oncoanalyser extends Construct {
   constructor(scope: Construct, id: string, props: OncoanalyserProps) {
     super(scope, id);
@@ -342,7 +346,7 @@ export class Oncoanalyser extends Construct {
           memory: cdk.Size.mebibytes(1000),
           jobRole: roleBatchInstancePipeline,
           environment: {
-            ONCOANALYSER_NEXTFLOW_CONFIG_BASE64: Buffer.from(nextflowConfig).toString('base64')
+            ONCOANALYSER_NEXTFLOW_CONFIG: nextflowConfig
           }
         },
       ),

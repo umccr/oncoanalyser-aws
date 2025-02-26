@@ -36,7 +36,7 @@ aws s3 cp ${params_fp} params.json
 output_base=$(jq -r .outdir params.json)
 
 # Nextflow config comes from an environment variable prepared by the deploying CDK
-echo $ONCOANALYSER_NEXTFLOW_CONFIG_BASE64 | base64 --decode > aws.config
+echo $ONCOANALYSER_NEXTFLOW_CONFIG > aws.config
 
 # Prepare AWS configuration file
 #get_ssm_parameter_value() {
