@@ -38,10 +38,6 @@ export type OncoanalyserProps = {
   docker: DockerImageBuildProps;
 };
 
-const processImages = {
-  fastp: "quay.io/biocontainers/fastp:0.23.4--hadf994f_2"
-}
-
 export class Oncoanalyser extends Construct {
   constructor(scope: Construct, id: string, props: OncoanalyserProps) {
     super(scope, id);
@@ -334,12 +330,9 @@ export class Oncoanalyser extends Construct {
     // modules/local/linxreport/main.nf:                             'biocontainers/r-linxreport:1.0.0--r43hdfd78af_0'
     // modules/local/pave/germline/main.nf:                          'biocontainers/hmftools-pave:1.7--hdfd78af_0'
     // modules/local/pave/somatic/main.nf:                           'biocontainers/hmftools-pave:1.7--hdfd78af_0'
-    // modules/local/esvee/prep/main.nf:                             'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
-    // modules/local/esvee/assemble/main.nf:                         'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
-    // modules/local/esvee/depth_annotator/main.nf:                  'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
-    // modules/local/esvee/call/main.nf:                             'biocontainers/hmftools-esvee:1.0--hdfd78af_0'
-    // modules/local/sambamba/merge/main.nf:                         'biocontainers/sambamba:1.0.1--h6f6fda4_0'
 
+    createProcessImageAsset(env, "ESVEE_DOCKER_IMAGE_URI", "EsveeImageAsset", "quay.io/biocontainers/hmftools-esvee:1.0--hdfd78af_0")
+    createProcessImageAsset(env, "SAMBAMBA_DOCKER_IMAGE_URI", "SambambaImageAsset", "quay.io/biocontainers/sambamba:1.0.1--h6f6fda4_0")
     createProcessImageAsset(env, "COBALT_DOCKER_IMAGE_URI", "CobaltImageAsset", "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0")
     createProcessImageAsset(env, "LINX_DOCKER_IMAGE_URI", "LinxImageAsset", "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0")
     createProcessImageAsset(env, "ISOFOX_DOCKER_IMAGE_URI", "IsofoxImageAsset", "quay.io/biocontainers/hmftools-isofox:1.7.1--hdfd78af_1")
