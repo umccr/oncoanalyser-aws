@@ -16,8 +16,9 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as Handlebars from "handlebars";
 import * as ecrDeployment from "cdk-ecr-deployment";
 import { Aws } from "aws-cdk-lib";
-import {ContainerImage} from "aws-cdk-lib/aws-ecs";
-import {Platform} from "aws-cdk-lib/aws-ecr-assets";
+import { ContainerImage } from "aws-cdk-lib/aws-ecs";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { NEXTFLOW_PLUGINS } from "./dependencies";
 
 export type BucketProps = {
   bucket: string;
@@ -78,8 +79,8 @@ export class Oncoanalyser extends Construct {
     });
 
     const launchTemplateTask = this.getLaunchTemplate({
-        securityGroup: securityGroup,
-        launchTemplateName: "oncoanalyser-task"
+      securityGroup: securityGroup,
+      launchTemplateName: "oncoanalyser-task"
     });
 
     const computeEnvironmentTask = new batch.ManagedEc2EcsComputeEnvironment(
@@ -265,7 +266,10 @@ export class Oncoanalyser extends Construct {
     // Create Docker image and deploy
     const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
       directory: path.join(__dirname, 'resources'),
-      platform: Platform.LINUX_AMD64
+      platform: Platform.LINUX_AMD64,
+      buildArgs: {
+        NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(",")
+      }
     });
 
     // Bucket permissions
@@ -308,6 +312,7 @@ export class Oncoanalyser extends Construct {
       BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
       S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
+      PLUGINS: NEXTFLOW_PLUGINS,
     }, { });
 
     // Create job definition for pipeline execution
