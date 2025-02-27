@@ -77,8 +77,9 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
-    const launchTemplate = this.getLaunchTemplate({
-      securityGroup: securityGroup,
+    const launchTemplateTask = this.getLaunchTemplate({
+        securityGroup: securityGroup,
+        launchTemplateName: "oncoanalyser-task"
     });
 
     const computeEnvironmentTask = new batch.ManagedEc2EcsComputeEnvironment(
@@ -88,7 +89,7 @@ export class Oncoanalyser extends Construct {
         allocationStrategy: batch.AllocationStrategy.BEST_FIT,
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
-        launchTemplate: launchTemplate,
+        launchTemplate: launchTemplateTask,
         maxvCpus: props.maxTaskCpus,
         securityGroups: [],
         useOptimalInstanceClasses: false,
@@ -96,6 +97,7 @@ export class Oncoanalyser extends Construct {
         vpcSubnets: {
           subnetType: ec2.SubnetType.PUBLIC,
         },
+
       },
     );
 
@@ -230,6 +232,11 @@ export class Oncoanalyser extends Construct {
       }),
     );
 
+    const launchTemplatePipeline = this.getLaunchTemplate({
+      securityGroup: securityGroup,
+      launchTemplateName: "oncoanalyser-pipeline"
+    });
+
     const computeEnvironmentPipeline =
       new batch.ManagedEc2EcsComputeEnvironment(
         this,
@@ -238,7 +245,7 @@ export class Oncoanalyser extends Construct {
           allocationStrategy: batch.AllocationStrategy.BEST_FIT,
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
-          launchTemplate: launchTemplate,
+          launchTemplate: launchTemplatePipeline,
           maxvCpus: props.maxPipelineCpus,
           securityGroups: [],
           useOptimalInstanceClasses: false,
@@ -324,7 +331,7 @@ export class Oncoanalyser extends Construct {
     });
   }
 
-  getLaunchTemplate(args: { securityGroup: ec2.ISecurityGroup }) {
+  getLaunchTemplate(args: { securityGroup: ec2.ISecurityGroup; launchTemplateName?: string  }) {
     const userData = ec2.UserData.custom(
       `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==BOUNDARY=="
@@ -359,12 +366,13 @@ bash /tmp/amazon-ebs-autoscale/install.sh
 rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
 --==BOUNDARY==--`,
     );
-
+    const ltName = args.launchTemplateName ?? "oncoanalyser";
+    const constructId = `LaunchTemplate-${ltName}`;
     const launchTemplate = new ec2.LaunchTemplate(
       this,
-      "LaunchTemplate",
+      constructId,
       {
-        launchTemplateName: "oncoanalyser",
+        launchTemplateName: ltName,
         associatePublicIpAddress: true,
         userData: userData,
         securityGroup: args.securityGroup,
