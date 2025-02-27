@@ -40,24 +40,8 @@ fi
 aws s3 cp ${params_fp} params.json
 output_base=$(jq -r .outdir params.json)
 
-# Prepare AWS configuration file
-get_ssm_parameter_value() {
-  aws ssm get-parameter \
-    --name ${1} \
-    --output json |
-  jq --raw-output '.Parameter | .Value'
-}
-
-sed \
-  --regexp-extended \
-  --expression \
-    "
-      s#__BATCH_INSTANCE_ROLE__#$(get_ssm_parameter_value /oncoanalyser_stack/batch_instance_task_role_arn)#g;
-      s#__S3_BUCKET_NAME__#$(get_ssm_parameter_value /oncoanalyser_stack/s3_bucket_name)#g;
-      s#__S3_BUCKET_REFDATA_PREFIX__#$(get_ssm_parameter_value /oncoanalyser_stack/s3_refdata_prefix)#g;
-      s#__BATCH_JOB_QUEUE_NAME__#$(get_ssm_parameter_value /oncoanalyser_stack/batch_job_queue_name)#g;
-    " \
-  /root/pipeline/other/nextflow_aws.template.config > aws.config
+# Nextflow config comes from an environment variable prepared by the deploying CDK
+echo $ONCOANALYSER_NEXTFLOW_CONFIG_BASE64 | base64 --decode > aws.config
 
 # Set additional Nextflow arguments
 nf_arg_stub=''
