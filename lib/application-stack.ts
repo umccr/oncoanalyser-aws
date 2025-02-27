@@ -379,7 +379,7 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
       },
     );
 
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow");
+    cdk.Tags.of(launchTemplate).add("Name", ltName);
     return launchTemplate;
   }
 }
