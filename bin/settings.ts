@@ -24,7 +24,7 @@ export const SETTINGS: OncoanalyserProps = {
     ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
   ],
   taskInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6ID, ec2.InstanceSize.LARGE),
+    ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.LARGE),
   ],
   vpc: undefined,
 };
