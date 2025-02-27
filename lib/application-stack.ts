@@ -12,12 +12,14 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as appconfig from 'aws-cdk-lib/aws-appconfig';
 
 import * as Handlebars from "handlebars";
 import * as ecrDeployment from "cdk-ecr-deployment";
-import { Aws } from "aws-cdk-lib";
+import {Aws, Stack, Token} from "aws-cdk-lib";
 import {ContainerImage} from "aws-cdk-lib/aws-ecs";
 import {Platform} from "aws-cdk-lib/aws-ecr-assets";
+import {DeploymentStrategyId} from "aws-cdk-lib/aws-appconfig";
 
 const BATCH_VOLUME_MOUNT_POINT = "/mnt/local_ephemeral/"
 
@@ -221,6 +223,18 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
+      new iam.Policy(this,  "PipelinePolicyAppConfig", {
+          roles: [roleBatchInstancePipeline],
+          statements: [
+              new iam.PolicyStatement({actions: [
+              "appconfig:GetLatestConfiguration",
+              "appconfig:StartConfigurationSession",
+          ],
+                  // should be tightened
+          resources: [`*`] })
+          ]
+      })
+
     roleBatchInstancePipeline.attachInlinePolicy(
       new iam.Policy(this, "PipelinePolicyPassRole", {
         statements: [
@@ -299,9 +313,25 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
+    const application = new appconfig.Application(this, 'NextflowConfig');
+    const environment = new appconfig.Environment(this, 'NextflowConfigEnvironment', {
+      application: application,
+    });
+
+      // given our nextflow only runs on demand (and only picks up the config on startup) - there is no point waiting when we roll out configs
+   const deploymentStrategy = new appconfig.DeploymentStrategy(this, 'DeploymentStrategy', {
+       deploymentStrategyName: 'AllAtOnceAsQuickAsWeCan',
+       rolloutStrategy: {
+           growthFactor: 100,
+           deploymentDuration: cdk.Duration.minutes(0),
+           finalBakeTime: cdk.Duration.minutes(0),
+       },
+    });
+
+
     const createProcessImageAsset = (env: any, envName: string, cdkId: string, imageName: string) => {
       const imageAsset = new ecrAssets.DockerImageAsset(this, cdkId, {
-        directory: path.join(__dirname, 'process_docker_images'),
+        directory: path.join(__dirname, 'task_docker_images'),
         platform: Platform.LINUX_AMD64,
         // because the image base name is passed into Docker - the actual Docker checksum
         // itself won't change even when the image base does... so we need to add it into the hash
@@ -324,43 +354,50 @@ export class Oncoanalyser extends Construct {
     };
 
       // modules/local/neo/annotate_fusions/main.nf:                   'biocontainers/hmftools-isofox:1.7.1--hdfd78af_1'
-    // modules/local/neo/scorer/main.nf:                             'biocontainers/hmftools-neo:1.2--hdfd78af_1'
-    // modules/local/neo/finder/main.nf:                             'biocontainers/hmftools-neo:1.2--hdfd78af_1'
-    // modules/local/bamtools/main.nf:                               'biocontainers/hmftools-bam-tools:1.3--hdfd78af_0'
-    // modules/local/linxreport/main.nf:                             'biocontainers/r-linxreport:1.0.0--r43hdfd78af_0'
-    // modules/local/pave/germline/main.nf:                          'biocontainers/hmftools-pave:1.7--hdfd78af_0'
-    // modules/local/pave/somatic/main.nf:                           'biocontainers/hmftools-pave:1.7--hdfd78af_0'
 
-    createProcessImageAsset(env, "ESVEE_DOCKER_IMAGE_URI", "EsveeImageAsset", "quay.io/biocontainers/hmftools-esvee:1.0--hdfd78af_0")
-    createProcessImageAsset(env, "SAMBAMBA_DOCKER_IMAGE_URI", "SambambaImageAsset", "quay.io/biocontainers/sambamba:1.0.1--h6f6fda4_0")
-    createProcessImageAsset(env, "COBALT_DOCKER_IMAGE_URI", "CobaltImageAsset", "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0")
-    createProcessImageAsset(env, "LINX_DOCKER_IMAGE_URI", "LinxImageAsset", "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0")
-    createProcessImageAsset(env, "ISOFOX_DOCKER_IMAGE_URI", "IsofoxImageAsset", "quay.io/biocontainers/hmftools-isofox:1.7.1--hdfd78af_1")
-    createProcessImageAsset(env, "AMBER_DOCKER_IMAGE_URI", "AmberImageAsset", "quay.io/biocontainers/hmftools-amber:4.1.1--hdfd78af_0")
-    createProcessImageAsset(env, "LILAC_DOCKER_IMAGE_URI", "LilacImageAsset", "quay.io/biocontainers/hmftools-lilac:1.6--hdfd78af_1")
-    createProcessImageAsset(env, "STAR_DOCKER_IMAGE_URI", "StarImageAsset", "quay.io/biocontainers/star:2.7.3a--0")
-    createProcessImageAsset(env, "PURPLE_DOCKER_IMAGE_URI", "PurpleImageAsset", "quay.io/biocontainers/hmftools-purple:4.1--hdfd78af_0")
-    createProcessImageAsset(env, "VIRUSBREAKEND_DOCKER_IMAGE_URI", "VirusBreakendImageAsset", "quay.io/nf-core/gridss:2.13.2--1")
-    createProcessImageAsset(env, "GRIDSS_DOCKER_IMAGE_URI", "GridssImageAsset", "quay.io/biocontainers/gridss:2.13.2--h50ea8bc_3")
-    createProcessImageAsset(env, "CHORD_DOCKER_IMAGE_URI", "ChordImageAsset", "quay.io/biocontainers/hmftools-chord:2.1.0--hdfd78af_0")
-    // modules/local/custom/lilac_extract_and_index_contig/main.nf:  'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
-    // modules/local/custom/lilac_realign_reads_lilac/main.nf:       'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
-    // modules/local/custom/lilac_slice/main.nf:                     'biocontainers/samtools:1.19.2--h50ea8bc_0'
-    // modules/local/bwa-mem2/mem/main.nf:                           'biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0'
-    createProcessImageAsset(env, "REDUX_DOCKER_IMAGE_URI", "ReduxImageAsset", "quay.io/biocontainers/hmftools-redux:1.1--hdfd78af_1")
-    createProcessImageAsset(env, "VIRUSINTERPRETER_DOCKER_IMAGE_URI", "VirusInterpreterImageAsset", "quay.io/biocontainers/hmftools-virus-interpreter:1.7--hdfd78af_0")
-    createProcessImageAsset(env, "SAGE_DOCKER_IMAGE_URI", "SageImageAsset", "quay.io/biocontainers/hmftools-sage:4.0--hdfd78af_0")
-    createProcessImageAsset(env, "CUPPA_DOCKER_IMAGE_URI", "CuppaImageAsset", "quay.io/biocontainers/hmftools-cuppa:2.3.1--py311r42hdfd78af_0")
-    createProcessImageAsset(env, "ORANGE_DOCKER_IMAGE_URI", "OrangeImageAsset", "quay.io/biocontainers/hmftools-orange:3.7.1--hdfd78af_0")
-    createProcessImageAsset(env, "FASTP_DOCKER_IMAGE_URI", "FastpImageAsset", "quay.io/biocontainers/fastp:0.23.4--hadf994f_2")
-    createProcessImageAsset(env, "SIGS_DOCKER_IMAGE_URI", "SigsImageAsset", "quay.io/biocontainers/hmftools-sigs:1.2.1--hdfd78af_1")
+    createProcessImageAsset(env, "NEO_DOCKER_IMAGE_URI", "NeoImageAsset", "quay.io/biocontainers/hmftools-neo:1.2--hdfd78af_1");
+    createProcessImageAsset(env, "BAMTOOLS_DOCKER_IMAGE_URI", "BamToolsImageAsset", "quay.io/biocontainers/hmftools-bam-tools:1.3--hdfd78af_0");
+    createProcessImageAsset(env, "LINXREPORT_DOCKER_IMAGE_URI", "LinxReportImageAsset", "quay.io/biocontainers/r-linxreport:1.0.0--r43hdfd78af_0");
+    createProcessImageAsset(env, "PAVE_DOCKER_IMAGE_URI", "PaveImageAsset", "quay.io/biocontainers/hmftools-pave:1.7--hdfd78af_0");
+    createProcessImageAsset(env, "ESVEE_DOCKER_IMAGE_URI", "EsveeImageAsset", "quay.io/biocontainers/hmftools-esvee:1.0--hdfd78af_0");
+    createProcessImageAsset(env, "SAMBAMBA_DOCKER_IMAGE_URI", "SambambaImageAsset", "quay.io/biocontainers/sambamba:1.0.1--h6f6fda4_0");
+    createProcessImageAsset(env, "COBALT_DOCKER_IMAGE_URI", "CobaltImageAsset", "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0");
+    createProcessImageAsset(env, "LINX_DOCKER_IMAGE_URI", "LinxImageAsset", "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0");
+    createProcessImageAsset(env, "ISOFOX_DOCKER_IMAGE_URI", "IsofoxImageAsset", "quay.io/biocontainers/hmftools-isofox:1.7.1--hdfd78af_1");
+    createProcessImageAsset(env, "AMBER_DOCKER_IMAGE_URI", "AmberImageAsset", "quay.io/biocontainers/hmftools-amber:4.1.1--hdfd78af_0");
+    createProcessImageAsset(env, "LILAC_DOCKER_IMAGE_URI", "LilacImageAsset", "quay.io/biocontainers/hmftools-lilac:1.6--hdfd78af_1");
+    createProcessImageAsset(env, "STAR_DOCKER_IMAGE_URI", "StarImageAsset", "quay.io/biocontainers/star:2.7.3a--0");
+    createProcessImageAsset(env, "PURPLE_DOCKER_IMAGE_URI", "PurpleImageAsset", "quay.io/biocontainers/hmftools-purple:4.1--hdfd78af_0");
+    createProcessImageAsset(env, "VIRUSBREAKEND_DOCKER_IMAGE_URI", "VirusBreakendImageAsset", "quay.io/nf-core/gridss:2.13.2--1");
+    createProcessImageAsset(env, "GRIDSS_DOCKER_IMAGE_URI", "GridssImageAsset", "quay.io/biocontainers/gridss:2.13.2--h50ea8bc_3");
+    createProcessImageAsset(env, "CHORD_DOCKER_IMAGE_URI", "ChordImageAsset", "quay.io/biocontainers/hmftools-chord:2.1.0--hdfd78af_0");
+    createProcessImageAsset(env, "LILAC_EXTRACT_INDEX_DOCKER_IMAGE_URI", "LilacExtractIndexImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
+    createProcessImageAsset(env, "LILAC_REALIGN_READS_DOCKER_IMAGE_URI", "LilacRealignReadsImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
+    createProcessImageAsset(env, "LILAC_SLICE_DOCKER_IMAGE_URI", "LilacSliceImageAsset", "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0");
+    createProcessImageAsset(env, "BWAMEM2_DOCKER_IMAGE_URI", "BwaMem2ImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
+    createProcessImageAsset(env, "REDUX_DOCKER_IMAGE_URI", "ReduxImageAsset", "quay.io/biocontainers/hmftools-redux:1.1--hdfd78af_1");
+    createProcessImageAsset(env, "VIRUSINTERPRETER_DOCKER_IMAGE_URI", "VirusInterpreterImageAsset", "quay.io/biocontainers/hmftools-virus-interpreter:1.7--hdfd78af_0");
+    createProcessImageAsset(env, "SAGE_DOCKER_IMAGE_URI", "SageImageAsset", "quay.io/biocontainers/hmftools-sage:4.0--hdfd78af_0");
+    createProcessImageAsset(env, "CUPPA_DOCKER_IMAGE_URI", "CuppaImageAsset", "quay.io/biocontainers/hmftools-cuppa:2.3.1--py311r42hdfd78af_0");
+    createProcessImageAsset(env, "ORANGE_DOCKER_IMAGE_URI", "OrangeImageAsset", "quay.io/biocontainers/hmftools-orange:3.7.1--hdfd78af_0");
+    createProcessImageAsset(env, "FASTP_DOCKER_IMAGE_URI", "FastpImageAsset", "quay.io/biocontainers/fastp:0.23.4--hadf994f_2");
+    createProcessImageAsset(env, "SIGS_DOCKER_IMAGE_URI", "SigsImageAsset", "quay.io/biocontainers/hmftools-sigs:1.2.1--hdfd78af_1");
 
     const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
     const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
     const nextflowConfig = nextflowConfigTemplateCompiled(env, { });
 
-    if (nextflowConfig.includes("DOCKER_IMAGE_URI"))
-      throw new Error("a docker image substitution was missed in the nextflow config presumably because of a simple name mismatch");
+    const config = new appconfig.HostedConfiguration(this, 'SampleConfig', {
+      application: application,
+      deployTo: [environment],
+      deploymentStrategy: deploymentStrategy,
+      content: appconfig.ConfigurationContent.fromInlineText(nextflowConfig)
+    });
+
+    // if a substitution of something like REDUX_DOCKER_IMAGE_URI does not happen - then we will be left with an empty string in the nextflow config
+    // as we don't have any real empty strings - we use this to detect missed subs
+    // if (nextflowConfig.includes("''"))
+    //  throw new Error("a docker image substitution was missed in the nextflow config presumably because of a simple name mismatch");
 
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
@@ -375,7 +412,9 @@ export class Oncoanalyser extends Construct {
           memory: cdk.Size.mebibytes(1000),
           jobRole: roleBatchInstancePipeline,
           environment: {
-            ONCOANALYSER_NEXTFLOW_CONFIG: nextflowConfig
+            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION: application.applicationId,
+            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_ENVIRONMENT: environment.environmentId,
+            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_CONFIGURATION_PROFILE: config.configurationProfileId
           }
         },
       ),
