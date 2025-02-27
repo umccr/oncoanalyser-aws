@@ -19,8 +19,6 @@ import { Aws } from "aws-cdk-lib";
 import {ContainerImage} from "aws-cdk-lib/aws-ecs";
 import {Platform} from "aws-cdk-lib/aws-ecr-assets";
 
-const BATCH_VOLUME_MOUNT_POINT = "/mnt/local_ephemeral/"
-
 export type BucketProps = {
   bucket: string;
   inputPrefix: string;
@@ -79,7 +77,7 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
-    const launchTemplateTask = this.getLaunchTemplateTask({
+    const launchTemplate = this.getLaunchTemplate({
       securityGroup: securityGroup,
     });
 
@@ -90,7 +88,7 @@ export class Oncoanalyser extends Construct {
         allocationStrategy: batch.AllocationStrategy.BEST_FIT,
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
-        launchTemplate: launchTemplateTask,
+        launchTemplate: launchTemplate,
         maxvCpus: props.maxTaskCpus,
         securityGroups: [],
         useOptimalInstanceClasses: false,
@@ -232,10 +230,6 @@ export class Oncoanalyser extends Construct {
       }),
     );
 
-    const launchTemplatePipeline = this.getLaunchTemplatePipeline({
-      securityGroup: securityGroup,
-    });
-
     const computeEnvironmentPipeline =
       new batch.ManagedEc2EcsComputeEnvironment(
         this,
@@ -244,7 +238,7 @@ export class Oncoanalyser extends Construct {
           allocationStrategy: batch.AllocationStrategy.BEST_FIT,
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
-          launchTemplate: launchTemplatePipeline,
+          launchTemplate: launchTemplate,
           maxvCpus: props.maxPipelineCpus,
           securityGroups: [],
           useOptimalInstanceClasses: false,
@@ -308,7 +302,6 @@ export class Oncoanalyser extends Construct {
       BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
       S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
-      BATCH_VOLUME_MOUNT_POINT: BATCH_VOLUME_MOUNT_POINT
     }, { });
 
     // Create job definition for pipeline execution
@@ -331,35 +324,7 @@ export class Oncoanalyser extends Construct {
     });
   }
 
-  getLaunchTemplateTask(args: { securityGroup: ec2.ISecurityGroup }) {
-    const userData = ec2.UserData.custom(
-      `MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="==BOUNDARY=="
-
---==BOUNDARY==
-Content-Type: text/x-shellscript; charset="us-ascii"
-
-#!/bin/bash
-mkdir -p ${BATCH_VOLUME_MOUNT_POINT}
-mkfs.ext4 /dev/nvme1n1
-mount /dev/nvme1n1 ${BATCH_VOLUME_MOUNT_POINT}
-chmod 777 ${BATCH_VOLUME_MOUNT_POINT}
-
---==BOUNDARY==--`,
-    );
-
-    const launchTemplate = new ec2.LaunchTemplate(this, "LaunchTemplateTask", {
-      launchTemplateName: "oncoanalyser-task",
-      associatePublicIpAddress: true,
-      userData: userData,
-      securityGroup: args.securityGroup,
-    });
-
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow-task");
-    return launchTemplate;
-  }
-
-  getLaunchTemplatePipeline(args: { securityGroup: ec2.ISecurityGroup }) {
+  getLaunchTemplate(args: { securityGroup: ec2.ISecurityGroup }) {
     const userData = ec2.UserData.custom(
       `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==BOUNDARY=="
@@ -397,16 +362,16 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
 
     const launchTemplate = new ec2.LaunchTemplate(
       this,
-      "LaunchTemplatePipeline",
+      "LaunchTemplate",
       {
-        launchTemplateName: "oncoanalyser-pipeline",
+        launchTemplateName: "oncoanalyser",
         associatePublicIpAddress: true,
         userData: userData,
         securityGroup: args.securityGroup,
       },
     );
 
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow-pipeline");
+    cdk.Tags.of(launchTemplate).add("Name", "nextflow");
     return launchTemplate;
   }
 }
