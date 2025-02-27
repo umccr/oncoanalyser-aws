@@ -9,6 +9,7 @@ import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { IJobQueue } from "aws-cdk-lib/aws-batch";
 import { Duration } from "aws-cdk-lib";
+import { NEXTFLOW_PLUGINS } from "./dependencies";
 
 export type NextflowConfigProps = {
   bucket: BucketProps;
@@ -69,7 +70,7 @@ export class NextflowConfigConstruct extends Construct {
     // we build a dictionary of substitution values that can be inserted into the config by handlebars
     // we first insert here the AWS values like role ARN etc that are needed by the Nextflow
     // pipeline engine
-    const substitutions: Record<string, string> = {
+    const substitutions: Record<string, any> = {
       BATCH_INSTANCE_TASK_ROLE_ARN: props.tasksInstanceRole.roleArn,
       BATCH_JOB_QUEUE_NAME: props.tasksJobQueue.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
