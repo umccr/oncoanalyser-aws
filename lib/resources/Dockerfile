@@ -1,5 +1,7 @@
 FROM docker.io/continuumio/miniconda3:25.1.1-2
 
+ARG NEXTFLOW_PLUGINS
+
 # Configure Conda
 RUN \
   echo '\
@@ -18,6 +20,9 @@ RUN \
     'nextflow=24.10.4' \
     'openjdk=17.0.10' && \
   conda clean -yaf
+
+# Install plugins for offline usage
+RUN nextflow plugin install ${NEXTFLOW_PLUGINS}
 
 # Install oncoanalyser and config template
 RUN \
