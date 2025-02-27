@@ -97,7 +97,6 @@ export class Oncoanalyser extends Construct {
         vpcSubnets: {
           subnetType: ec2.SubnetType.PUBLIC,
         },
-
       },
     );
 
