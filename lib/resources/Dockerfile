@@ -24,6 +24,7 @@ RUN \
   git clone -b aws-stack-testing https://github.com/scwatts/oncoanalyser-aws-stack-testing /root/pipeline/software/oncoanalyser/
 
 COPY nextflow_aws.template.config /root/pipeline/other/
+
 COPY run.sh /root/pipeline/other/
 
 WORKDIR /root/pipeline/
