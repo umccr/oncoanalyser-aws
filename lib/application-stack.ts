@@ -35,7 +35,6 @@ export type OncoanalyserProps = {
   maxPipelineCpus: number;
   maxTaskCpus: number;
   bucket: BucketProps;
-  docker: DockerImageBuildProps;
 };
 
 export class Oncoanalyser extends Construct {
@@ -88,7 +87,7 @@ export class Oncoanalyser extends Construct {
       this,
       "ComputeEnvironmentTask",
       {
-        allocationStrategy: batch.AllocationStrategy.BEST_FIT,
+        allocationStrategy: batch.AllocationStrategy.BEST_FIT_PROGRESSIVE,
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
         launchTemplate: launchTemplateTask,
@@ -146,8 +145,12 @@ export class Oncoanalyser extends Construct {
           ],
 
           resources: [
-            jobQueueTask.jobQueueArn,
-            `arn:aws:batch:${Aws.REGION}:${Aws.ACCOUNT_ID}:job-definition/nf-*`,
+            "*",
+              // TODO: replace back in tighter permissions
+              // jobQueueTask.jobQueueArn,
+             // `arn:aws:batch:${Aws.REGION}:${Aws.ACCOUNT_ID}:job-definition/nf-*`,
+
+              // probably needs to be given grantSubmit or something to the docker assets
           ],
         }),
       ],
@@ -225,12 +228,15 @@ export class Oncoanalyser extends Construct {
       new iam.Policy(this,  "PipelinePolicyAppConfig", {
           roles: [roleBatchInstancePipeline],
           statements: [
-              new iam.PolicyStatement({actions: [
-              "appconfig:GetLatestConfiguration",
-              "appconfig:StartConfigurationSession",
-          ],
-                  // should be tightened
-          resources: [`*`] })
+              new iam.PolicyStatement(
+                  {
+
+                      actions: [
+                      "appconfig:GetLatestConfiguration",
+                      "appconfig:StartConfigurationSession",
+                  ],
+                          // should be tightened
+                  resources: [`*`] })
           ]
       })
 
@@ -255,7 +261,7 @@ export class Oncoanalyser extends Construct {
         this,
         "ComputeEnvironmentPipeline",
         {
-          allocationStrategy: batch.AllocationStrategy.BEST_FIT,
+          allocationStrategy: batch.AllocationStrategy.BEST_FIT_PROGRESSIVE,
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
           launchTemplate: launchTemplatePipeline,
@@ -461,7 +467,6 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
       this,
       constructId,
       {
-        launchTemplateName: ltName,
         associatePublicIpAddress: true,
         userData: userData,
         securityGroup: args.securityGroup,
@@ -470,41 +475,5 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
 
     cdk.Tags.of(launchTemplate).add("Name", ltName);
     return launchTemplate;
-  }
-}
-
-export type DockerImageBuildProps = {
-  ecrRepo: string;
-  dockerImageTag: string;
-};
-
-export class DockerImageBuild extends Construct {
-  public readonly image: ecs.EcrImage;
-
-  constructor(scope: Construct, id: string, props: DockerImageBuildProps) {
-    super(scope, id);
-
-    const image = new ecrAssets.DockerImageAsset(this, "DockerImage", {
-      directory: path.join(__dirname, "resources"),
-    });
-
-    const dockerDestBase = `${Aws.ACCOUNT_ID}.dkr.ecr.${Aws.REGION}.amazonaws.com`;
-
-    new ecrDeployment.ECRDeployment(this, "DeployDockerImage", {
-      src: new ecrDeployment.DockerImageName(image.imageUri),
-      dest: new ecrDeployment.DockerImageName(
-        `${dockerDestBase}/${props.ecrRepo}:${props.dockerImageTag}`,
-      ),
-    });
-
-    const ecrRepository = ecr.Repository.fromRepositoryName(
-      this,
-      "EcrRespository",
-      props.ecrRepo,
-    );
-    this.image = ecs.EcrImage.fromEcrRepository(
-      ecrRepository,
-      props.dockerImageTag,
-    );
   }
 }
