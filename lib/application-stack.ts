@@ -355,7 +355,7 @@ chmod 777 ${BATCH_VOLUME_MOUNT_POINT}
       securityGroup: args.securityGroup,
     });
 
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow-task");
+    cdk.Tags.of(launchTemplate).add("Name", "oncoanalyser-task");
     return launchTemplate;
   }
 
@@ -406,7 +406,7 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
       },
     );
 
-    cdk.Tags.of(launchTemplate).add("Name", "nextflow-pipeline");
+    cdk.Tags.of(launchTemplate).add("Name", "oncoanalyser-pipeline");
     return launchTemplate;
   }
 }

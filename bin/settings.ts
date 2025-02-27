@@ -15,8 +15,11 @@ export const SETTINGS: OncoanalyserProps = {
         ecrRepo: "oncoanalyser",
         dockerImageTag: "latest-pmcc",
     },
-    maxPipelineCpus: 64,
-    maxTaskCpus: 256,
+    // NOTE(SW): temporary reduction for testing during dev
+    //maxPipelineCpus: 64,
+    //maxTaskCpus: 256,
+    maxPipelineCpus: 2,
+    maxTaskCpus: 4,
     pipelineInstanceTypes: [
         ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
     ],
