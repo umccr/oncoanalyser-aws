@@ -1,25 +1,17 @@
 import { Construct } from "constructs";
 
 import * as path from "path";
-import * as fs from "fs";
 
 import * as batch from "aws-cdk-lib/aws-batch";
 import * as cdk from "aws-cdk-lib";
+import { Aws } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecrAssets from "aws-cdk-lib/aws-ecr-assets";
-import * as ecs from "aws-cdk-lib/aws-ecs";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { ContainerImage } from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-import * as appconfig from 'aws-cdk-lib/aws-appconfig';
-
-import * as Handlebars from "handlebars";
-import * as ecrDeployment from "cdk-ecr-deployment";
-import {Aws, Stack, Token} from "aws-cdk-lib";
-import {ContainerImage} from "aws-cdk-lib/aws-ecs";
-import {Platform} from "aws-cdk-lib/aws-ecr-assets";
-import {DeploymentStrategyId} from "aws-cdk-lib/aws-appconfig";
+import { NextflowConfigConstruct } from "./nextflow-config-construct";
 
 export type BucketProps = {
   bucket: string;
@@ -79,8 +71,8 @@ export class Oncoanalyser extends Construct {
     });
 
     const launchTemplateTask = this.getLaunchTemplate({
-        securityGroup: securityGroup,
-        launchTemplateName: "oncoanalyser-task"
+      securityGroup: securityGroup,
+      launchTemplateName: "oncoanalyser-task",
     });
 
     const computeEnvironmentTask = new batch.ManagedEc2EcsComputeEnvironment(
@@ -145,12 +137,9 @@ export class Oncoanalyser extends Construct {
           ],
 
           resources: [
-            "*",
-              // TODO: replace back in tighter permissions
-              // jobQueueTask.jobQueueArn,
-             // `arn:aws:batch:${Aws.REGION}:${Aws.ACCOUNT_ID}:job-definition/nf-*`,
-
-              // probably needs to be given grantSubmit or something to the docker assets
+            jobQueueTask.jobQueueArn,
+            // this is the naming format of the job definitions made by the pipeline node
+            `arn:aws:batch:${Aws.REGION}:${Aws.ACCOUNT_ID}:job-definition/nf-*`,
           ],
         }),
       ],
@@ -225,20 +214,19 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
-      new iam.Policy(this,  "PipelinePolicyAppConfig", {
-          roles: [roleBatchInstancePipeline],
-          statements: [
-              new iam.PolicyStatement(
-                  {
-
-                      actions: [
-                      "appconfig:GetLatestConfiguration",
-                      "appconfig:StartConfigurationSession",
-                  ],
-                          // should be tightened
-                  resources: [`*`] })
-          ]
-      })
+    new iam.Policy(this, "PipelinePolicyAppConfig", {
+      roles: [roleBatchInstancePipeline],
+      statements: [
+        new iam.PolicyStatement({
+          actions: [
+            "appconfig:GetLatestConfiguration",
+            "appconfig:StartConfigurationSession",
+          ],
+          // should be tightened
+          resources: [`*`],
+        }),
+      ],
+    });
 
     roleBatchInstancePipeline.attachInlinePolicy(
       new iam.Policy(this, "PipelinePolicyPassRole", {
@@ -253,7 +241,7 @@ export class Oncoanalyser extends Construct {
 
     const launchTemplatePipeline = this.getLaunchTemplate({
       securityGroup: securityGroup,
-      launchTemplateName: "oncoanalyser-pipeline"
+      launchTemplateName: "oncoanalyser-pipeline",
     });
 
     const computeEnvironmentPipeline =
@@ -282,10 +270,10 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
-    // Create Docker image and deploy
-    const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
-      directory: path.join(__dirname, 'resources'),
-      platform: Platform.LINUX_AMD64
+    // create Docker image for pipeline
+    const image = new ecrAssets.DockerImageAsset(this, "DockerImage", {
+      directory: path.join(__dirname, "resources"),
+      platform: Platform.LINUX_AMD64,
     });
 
     // Bucket permissions
@@ -319,90 +307,12 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
-    const application = new appconfig.Application(this, 'NextflowConfig');
-    const environment = new appconfig.Environment(this, 'NextflowConfigEnvironment', {
-      application: application,
+    const config = new NextflowConfigConstruct(this, "NextflowConfig", {
+      bucket: props.bucket,
+      tasksInstanceRole: roleBatchInstanceTask,
+      tasksJobQueue: jobQueueTask,
+      copyToLocalEcr: true,
     });
-
-      // given our nextflow only runs on demand (and only picks up the config on startup) - there is no point waiting when we roll out configs
-   const deploymentStrategy = new appconfig.DeploymentStrategy(this, 'DeploymentStrategy', {
-       deploymentStrategyName: 'AllAtOnceAsQuickAsWeCan',
-       rolloutStrategy: {
-           growthFactor: 100,
-           deploymentDuration: cdk.Duration.minutes(0),
-           finalBakeTime: cdk.Duration.minutes(0),
-       },
-    });
-
-
-    const createProcessImageAsset = (env: any, envName: string, cdkId: string, imageName: string) => {
-      const imageAsset = new ecrAssets.DockerImageAsset(this, cdkId, {
-        directory: path.join(__dirname, 'task_docker_images'),
-        platform: Platform.LINUX_AMD64,
-        // because the image base name is passed into Docker - the actual Docker checksum
-        // itself won't change even when the image base does... so we need to add it into the hash
-        extraHash: imageName,
-        buildArgs: {
-          // pass this through to Docker forming the base of the image we are constructing
-          BASE_IMAGE: imageName,
-        }
-      });
-
-      env[envName] = imageAsset.imageUri;
-    }
-
-    const env: Record<string,string> = {
-      BATCH_INSTANCE_TASK_ROLE_ARN: roleBatchInstanceTask.roleArn,
-      BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
-      S3_BUCKET_NAME: props.bucket.bucket,
-      S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
-    };
-
-      // modules/local/neo/annotate_fusions/main.nf:                   'biocontainers/hmftools-isofox:1.7.1--hdfd78af_1'
-
-    createProcessImageAsset(env, "NEO_DOCKER_IMAGE_URI", "NeoImageAsset", "quay.io/biocontainers/hmftools-neo:1.2--hdfd78af_1");
-    createProcessImageAsset(env, "BAMTOOLS_DOCKER_IMAGE_URI", "BamToolsImageAsset", "quay.io/biocontainers/hmftools-bam-tools:1.3--hdfd78af_0");
-    createProcessImageAsset(env, "LINXREPORT_DOCKER_IMAGE_URI", "LinxReportImageAsset", "quay.io/biocontainers/r-linxreport:1.0.0--r43hdfd78af_0");
-    createProcessImageAsset(env, "PAVE_DOCKER_IMAGE_URI", "PaveImageAsset", "quay.io/biocontainers/hmftools-pave:1.7--hdfd78af_0");
-    createProcessImageAsset(env, "ESVEE_DOCKER_IMAGE_URI", "EsveeImageAsset", "quay.io/biocontainers/hmftools-esvee:1.0--hdfd78af_0");
-    createProcessImageAsset(env, "SAMBAMBA_DOCKER_IMAGE_URI", "SambambaImageAsset", "quay.io/biocontainers/sambamba:1.0.1--h6f6fda4_0");
-    createProcessImageAsset(env, "COBALT_DOCKER_IMAGE_URI", "CobaltImageAsset", "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0");
-    createProcessImageAsset(env, "LINX_DOCKER_IMAGE_URI", "LinxImageAsset", "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0");
-    createProcessImageAsset(env, "ISOFOX_DOCKER_IMAGE_URI", "IsofoxImageAsset", "quay.io/biocontainers/hmftools-isofox:1.7.1--hdfd78af_1");
-    createProcessImageAsset(env, "AMBER_DOCKER_IMAGE_URI", "AmberImageAsset", "quay.io/biocontainers/hmftools-amber:4.1.1--hdfd78af_0");
-    createProcessImageAsset(env, "LILAC_DOCKER_IMAGE_URI", "LilacImageAsset", "quay.io/biocontainers/hmftools-lilac:1.6--hdfd78af_1");
-    createProcessImageAsset(env, "STAR_DOCKER_IMAGE_URI", "StarImageAsset", "quay.io/biocontainers/star:2.7.3a--0");
-    createProcessImageAsset(env, "PURPLE_DOCKER_IMAGE_URI", "PurpleImageAsset", "quay.io/biocontainers/hmftools-purple:4.1--hdfd78af_0");
-    createProcessImageAsset(env, "VIRUSBREAKEND_DOCKER_IMAGE_URI", "VirusBreakendImageAsset", "quay.io/nf-core/gridss:2.13.2--1");
-    createProcessImageAsset(env, "GRIDSS_DOCKER_IMAGE_URI", "GridssImageAsset", "quay.io/biocontainers/gridss:2.13.2--h50ea8bc_3");
-    createProcessImageAsset(env, "CHORD_DOCKER_IMAGE_URI", "ChordImageAsset", "quay.io/biocontainers/hmftools-chord:2.1.0--hdfd78af_0");
-    createProcessImageAsset(env, "LILAC_EXTRACT_INDEX_DOCKER_IMAGE_URI", "LilacExtractIndexImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
-    createProcessImageAsset(env, "LILAC_REALIGN_READS_DOCKER_IMAGE_URI", "LilacRealignReadsImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
-    createProcessImageAsset(env, "LILAC_SLICE_DOCKER_IMAGE_URI", "LilacSliceImageAsset", "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0");
-    createProcessImageAsset(env, "BWAMEM2_DOCKER_IMAGE_URI", "BwaMem2ImageAsset", "quay.io/biocontainers/mulled-v2-4dde50190ae599f2bb2027cb2c8763ea00fb5084:4163e62e1daead7b7ea0228baece715bec295c22-0");
-    createProcessImageAsset(env, "REDUX_DOCKER_IMAGE_URI", "ReduxImageAsset", "quay.io/biocontainers/hmftools-redux:1.1--hdfd78af_1");
-    createProcessImageAsset(env, "VIRUSINTERPRETER_DOCKER_IMAGE_URI", "VirusInterpreterImageAsset", "quay.io/biocontainers/hmftools-virus-interpreter:1.7--hdfd78af_0");
-    createProcessImageAsset(env, "SAGE_DOCKER_IMAGE_URI", "SageImageAsset", "quay.io/biocontainers/hmftools-sage:4.0--hdfd78af_0");
-    createProcessImageAsset(env, "CUPPA_DOCKER_IMAGE_URI", "CuppaImageAsset", "quay.io/biocontainers/hmftools-cuppa:2.3.1--py311r42hdfd78af_0");
-    createProcessImageAsset(env, "ORANGE_DOCKER_IMAGE_URI", "OrangeImageAsset", "quay.io/biocontainers/hmftools-orange:3.7.1--hdfd78af_0");
-    createProcessImageAsset(env, "FASTP_DOCKER_IMAGE_URI", "FastpImageAsset", "quay.io/biocontainers/fastp:0.23.4--hadf994f_2");
-    createProcessImageAsset(env, "SIGS_DOCKER_IMAGE_URI", "SigsImageAsset", "quay.io/biocontainers/hmftools-sigs:1.2.1--hdfd78af_1");
-
-    const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
-    const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
-    const nextflowConfig = nextflowConfigTemplateCompiled(env, { });
-
-    const config = new appconfig.HostedConfiguration(this, 'SampleConfig', {
-      application: application,
-      deployTo: [environment],
-      deploymentStrategy: deploymentStrategy,
-      content: appconfig.ConfigurationContent.fromInlineText(nextflowConfig)
-    });
-
-    // if a substitution of something like REDUX_DOCKER_IMAGE_URI does not happen - then we will be left with an empty string in the nextflow config
-    // as we don't have any real empty strings - we use this to detect missed subs
-    // if (nextflowConfig.includes("''"))
-    //  throw new Error("a docker image substitution was missed in the nextflow config presumably because of a simple name mismatch");
 
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
@@ -414,19 +324,18 @@ export class Oncoanalyser extends Construct {
           cpu: 1,
           image: ContainerImage.fromDockerImageAsset(image),
           command: ["true"],
-          memory: cdk.Size.mebibytes(1000),
+          memory: cdk.Size.gibibytes(1),
           jobRole: roleBatchInstancePipeline,
-          environment: {
-            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION: application.applicationId,
-            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_ENVIRONMENT: environment.environmentId,
-            ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_CONFIGURATION_PROFILE: config.configurationProfileId
-          }
+          environment: config.getEnvironmentVariables(),
         },
       ),
     });
   }
 
-  getLaunchTemplate(args: { securityGroup: ec2.ISecurityGroup; launchTemplateName?: string  }) {
+  getLaunchTemplate(args: {
+    securityGroup: ec2.ISecurityGroup;
+    launchTemplateName?: string;
+  }) {
     const userData = ec2.UserData.custom(
       `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==BOUNDARY=="
@@ -463,15 +372,11 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
     );
     const ltName = args.launchTemplateName ?? "oncoanalyser";
     const constructId = `LaunchTemplate-${ltName}`;
-    const launchTemplate = new ec2.LaunchTemplate(
-      this,
-      constructId,
-      {
-        associatePublicIpAddress: true,
-        userData: userData,
-        securityGroup: args.securityGroup,
-      },
-    );
+    const launchTemplate = new ec2.LaunchTemplate(this, constructId, {
+      associatePublicIpAddress: true,
+      userData: userData,
+      securityGroup: args.securityGroup,
+    });
 
     cdk.Tags.of(launchTemplate).add("Name", ltName);
     return launchTemplate;
