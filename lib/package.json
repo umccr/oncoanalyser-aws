@@ -1,0 +1,48 @@
+{
+  "name": "@umccr/oncoanalyser-aws",
+  "version": "0.0.0",
+  "main": "application-stack.js",
+  "types": "application-stack.d.ts",
+  "scripts": {
+    "build": "jsii",
+    "build:watch": "jsii --watch",
+    "package": "jsii-pacmak"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umccr/oncoanalyser-aws.git"
+  },
+  "author": "University of Melbourne Centre for Cancer Research",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/umccr/oncoanalyser-aws/issues"
+  },
+  "homepage": "https://github.com/umccr/oncoanalyser-aws#readme",
+  "stability": "stable",
+  "jsii": {
+    "outdir": "dist",
+    "versionFormat": "short",
+    "targets": {},
+    "tsc": {}
+  },
+  "devDependencies": {
+    "jsii": "^5.7.6",
+    "jsii-pacmak": "^1.108.0",
+    "aws-cdk-lib": "2.177.0",
+    "constructs": "10.1.312",
+    "aws-cdk": "2.177.0"
+
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8",
+    "cdk-ecr-deployment": "^3.0.33"
+  },
+  "bundledDependencies": [
+    "handlebars"
+  ],
+  "peerDependencies": {
+    "aws-cdk-lib": "2.177.0",
+    "constructs": "^10.1.312"
+  },
+  "description": ""
+}
