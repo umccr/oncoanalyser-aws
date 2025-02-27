@@ -112,6 +112,21 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       substitutions,
+      "SAMTOOLS_DOCKER_IMAGE_URI",
+      "quay.io/biocontainers/samtools:1.18--h50ea8bc_",
+    );
+    fixConfigSectionForTask(
+      substitutions,
+      "STAR_ALIGN_IMAGE_URI",
+      "quay.io/biocontainers/star:2.7.3a--0",
+    );
+    fixConfigSectionForTask(
+      substitutions,
+      "GRIPSS_DOCKER_IMAGE_URI",
+      "quay.io/biocontainers/hmftools-gripss:2.4--hdfd78af_00",
+    );
+    fixConfigSectionForTask(
+      substitutions,
       "COBALT_DOCKER_IMAGE_URI",
       "quay.io/biocontainers/hmftools-cobalt:2.0--hdfd78af_0",
     );
@@ -152,8 +167,13 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       substitutions,
-      "GRIDSS_DOCKER_IMAGE_URI",
+      "GRIDSS_INDEX_DOCKER_IMAGE_URI",
       "quay.io/biocontainers/gridss:2.13.2--h50ea8bc_3",
+    );
+    fixConfigSectionForTask(
+      substitutions,
+      "GATK4_MARKDUPLICATES_IMAGE_URI",
+      "quay.io/biocontainers/gatk4:4.4.0.0--py36hdfd78af_0",
     );
     fixConfigSectionForTask(
       substitutions,
