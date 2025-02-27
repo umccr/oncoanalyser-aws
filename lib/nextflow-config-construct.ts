@@ -74,6 +74,7 @@ export class NextflowConfigConstruct extends Construct {
       BATCH_JOB_QUEUE_NAME: props.tasksJobQueue.jobQueueName,
       S3_BUCKET_NAME: props.bucket.bucket,
       S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
+      PLUGINS: NEXTFLOW_PLUGINS,
     };
 
     // modules/local/neo/annotate_fusions/main.nf:                   'biocontainers/hmftools-isofox:1.7.1--hdfd78af_1'
