@@ -311,7 +311,7 @@ export class Oncoanalyser extends Construct {
       bucket: props.bucket,
       tasksInstanceRole: roleBatchInstanceTask,
       tasksJobQueue: jobQueueTask,
-      copyToLocalEcr: true,
+      copyToLocalEcr: false,
     });
 
     // Create job definition for pipeline execution
