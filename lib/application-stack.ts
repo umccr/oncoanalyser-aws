@@ -1,23 +1,17 @@
 import { Construct } from "constructs";
 
 import * as path from "path";
-import * as fs from "fs";
 
 import * as batch from "aws-cdk-lib/aws-batch";
 import * as cdk from "aws-cdk-lib";
+import { Aws } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecrAssets from "aws-cdk-lib/aws-ecr-assets";
-import * as ecs from "aws-cdk-lib/aws-ecs";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { ContainerImage } from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-
-import * as Handlebars from "handlebars";
-import * as ecrDeployment from "cdk-ecr-deployment";
-import { Aws } from "aws-cdk-lib";
-import { ContainerImage } from "aws-cdk-lib/aws-ecs";
-import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { NextflowConfigConstruct } from "./nextflow-config-construct";
 import { NEXTFLOW_PLUGINS } from "./dependencies";
 
 export type BucketProps = {
@@ -34,7 +28,6 @@ export type OncoanalyserProps = {
   maxPipelineCpus: number;
   maxTaskCpus: number;
   bucket: BucketProps;
-  docker: DockerImageBuildProps;
 };
 
 export class Oncoanalyser extends Construct {
@@ -80,14 +73,14 @@ export class Oncoanalyser extends Construct {
 
     const launchTemplateTask = this.getLaunchTemplate({
       securityGroup: securityGroup,
-      launchTemplateName: "oncoanalyser-task"
+      launchTemplateName: "oncoanalyser-task",
     });
 
     const computeEnvironmentTask = new batch.ManagedEc2EcsComputeEnvironment(
       this,
       "ComputeEnvironmentTask",
       {
-        allocationStrategy: batch.AllocationStrategy.BEST_FIT,
+        allocationStrategy: batch.AllocationStrategy.BEST_FIT_PROGRESSIVE,
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
         launchTemplate: launchTemplateTask,
@@ -146,6 +139,7 @@ export class Oncoanalyser extends Construct {
 
           resources: [
             jobQueueTask.jobQueueArn,
+            // this is the naming format of the job definitions made by the pipeline node
             `arn:aws:batch:${Aws.REGION}:${Aws.ACCOUNT_ID}:job-definition/nf-*`,
           ],
         }),
@@ -221,6 +215,20 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
+    new iam.Policy(this, "PipelinePolicyAppConfig", {
+      roles: [roleBatchInstancePipeline],
+      statements: [
+        new iam.PolicyStatement({
+          actions: [
+            "appconfig:GetLatestConfiguration",
+            "appconfig:StartConfigurationSession",
+          ],
+          // should be tightened
+          resources: [`*`],
+        }),
+      ],
+    });
+
     roleBatchInstancePipeline.attachInlinePolicy(
       new iam.Policy(this, "PipelinePolicyPassRole", {
         statements: [
@@ -234,7 +242,7 @@ export class Oncoanalyser extends Construct {
 
     const launchTemplatePipeline = this.getLaunchTemplate({
       securityGroup: securityGroup,
-      launchTemplateName: "oncoanalyser-pipeline"
+      launchTemplateName: "oncoanalyser-pipeline",
     });
 
     const computeEnvironmentPipeline =
@@ -242,7 +250,7 @@ export class Oncoanalyser extends Construct {
         this,
         "ComputeEnvironmentPipeline",
         {
-          allocationStrategy: batch.AllocationStrategy.BEST_FIT,
+          allocationStrategy: batch.AllocationStrategy.BEST_FIT_PROGRESSIVE,
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
           launchTemplate: launchTemplatePipeline,
@@ -263,13 +271,13 @@ export class Oncoanalyser extends Construct {
       ],
     });
 
-    // Create Docker image and deploy
-    const image = new ecrAssets.DockerImageAsset(this, 'DockerImage', {
-      directory: path.join(__dirname, 'resources'),
+    // create Docker image for pipeline
+    const image = new ecrAssets.DockerImageAsset(this, "DockerImage", {
+      directory: path.join(__dirname, "resources"),
       platform: Platform.LINUX_AMD64,
       buildArgs: {
-        NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(",")
-      }
+        NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(","),
+      },
     });
 
     // Bucket permissions
@@ -303,17 +311,12 @@ export class Oncoanalyser extends Construct {
       `${props.bucket.outputPrefix}/*`,
     );
 
-    const nextflowConfigTemplate = fs.readFileSync(path.join(__dirname, "resources/nextflow_aws.template.config"), { encoding: "utf-8"});
-
-    const nextflowConfigTemplateCompiled = Handlebars.compile(nextflowConfigTemplate);
-
-    const nextflowConfig = nextflowConfigTemplateCompiled({
-      BATCH_INSTANCE_TASK_ROLE_ARN: roleBatchInstanceTask.roleArn,
-      BATCH_JOB_QUEUE_NAME: jobQueueTask.jobQueueName,
-      S3_BUCKET_NAME: props.bucket.bucket,
-      S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
-      PLUGINS: NEXTFLOW_PLUGINS,
-    }, { });
+    const config = new NextflowConfigConstruct(this, "NextflowConfig", {
+      bucket: props.bucket,
+      tasksInstanceRole: roleBatchInstanceTask,
+      tasksJobQueue: jobQueueTask,
+      copyToLocalEcr: false,
+    });
 
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
@@ -325,17 +328,18 @@ export class Oncoanalyser extends Construct {
           cpu: 1,
           image: ContainerImage.fromDockerImageAsset(image),
           command: ["true"],
-          memory: cdk.Size.mebibytes(1000),
+          memory: cdk.Size.gibibytes(1),
           jobRole: roleBatchInstancePipeline,
-          environment: {
-            ONCOANALYSER_NEXTFLOW_CONFIG_BASE64: Buffer.from(nextflowConfig).toString('base64')
-          }
+          environment: config.getEnvironmentVariables(),
         },
       ),
     });
   }
 
-  getLaunchTemplate(args: { securityGroup: ec2.ISecurityGroup; launchTemplateName?: string  }) {
+  getLaunchTemplate(args: {
+    securityGroup: ec2.ISecurityGroup;
+    launchTemplateName?: string;
+  }) {
     const userData = ec2.UserData.custom(
       `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==BOUNDARY=="
@@ -372,54 +376,13 @@ rm -rf /tmp/awscliv2.zip /tmp/aws/ /tmp/amazon-ebs-autoscale/
     );
     const ltName = args.launchTemplateName ?? "oncoanalyser";
     const constructId = `LaunchTemplate-${ltName}`;
-    const launchTemplate = new ec2.LaunchTemplate(
-      this,
-      constructId,
-      {
-        launchTemplateName: ltName,
-        associatePublicIpAddress: true,
-        userData: userData,
-        securityGroup: args.securityGroup,
-      },
-    );
+    const launchTemplate = new ec2.LaunchTemplate(this, constructId, {
+      associatePublicIpAddress: true,
+      userData: userData,
+      securityGroup: args.securityGroup,
+    });
 
     cdk.Tags.of(launchTemplate).add("Name", ltName);
     return launchTemplate;
-  }
-}
-
-export type DockerImageBuildProps = {
-  ecrRepo: string;
-  dockerImageTag: string;
-};
-
-export class DockerImageBuild extends Construct {
-  public readonly image: ecs.EcrImage;
-
-  constructor(scope: Construct, id: string, props: DockerImageBuildProps) {
-    super(scope, id);
-
-    const image = new ecrAssets.DockerImageAsset(this, "DockerImage", {
-      directory: path.join(__dirname, "resources"),
-    });
-
-    const dockerDestBase = `${Aws.ACCOUNT_ID}.dkr.ecr.${Aws.REGION}.amazonaws.com`;
-
-    new ecrDeployment.ECRDeployment(this, "DeployDockerImage", {
-      src: new ecrDeployment.DockerImageName(image.imageUri),
-      dest: new ecrDeployment.DockerImageName(
-        `${dockerDestBase}/${props.ecrRepo}:${props.dockerImageTag}`,
-      ),
-    });
-
-    const ecrRepository = ecr.Repository.fromRepositoryName(
-      this,
-      "EcrRespository",
-      props.ecrRepo,
-    );
-    this.image = ecs.EcrImage.fromEcrRepository(
-      ecrRepository,
-      props.dockerImageTag,
-    );
   }
 }

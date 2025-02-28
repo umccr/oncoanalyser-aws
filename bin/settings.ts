@@ -11,10 +11,6 @@ export const SETTINGS: OncoanalyserProps = {
     outputPrefix: "outputs",
     refDataPrefix: "refdata",
   },
-  docker: {
-    ecrRepo: "oncoanalyser",
-    dockerImageTag: "latest-pmcc",
-  },
   // NOTE(SW): temporary reduction for testing during dev
   //maxPipelineCpus: 64,
   //maxTaskCpus: 256,
@@ -24,7 +20,7 @@ export const SETTINGS: OncoanalyserProps = {
     ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
   ],
   taskInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.LARGE),
+    ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.XLARGE),
   ],
   vpc: undefined,
 };
