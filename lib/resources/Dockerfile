@@ -1,6 +1,8 @@
 FROM docker.io/continuumio/miniconda3:25.1.1-2
 
 ARG NEXTFLOW_PLUGINS
+ARG SOFTWARE_GIT_REPO
+ARG SOFTWARE_GIT_BRANCH
 
 # Configure Conda
 RUN \
@@ -26,7 +28,7 @@ RUN nextflow plugin install ${NEXTFLOW_PLUGINS}
 
 # Install oncoanalyser and config template
 RUN \
-  git clone -b aws-stack-testing https://github.com/scwatts/oncoanalyser-aws-stack-testing /root/pipeline/software/oncoanalyser/
+  git clone -b ${SOFTWARE_GIT_BRANCH} ${SOFTWARE_GIT_REPO} /root/pipeline/software/oncoanalyser/
 
 COPY nextflow_aws.template.config /root/pipeline/other/
 

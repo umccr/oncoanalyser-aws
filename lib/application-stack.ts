@@ -23,11 +23,20 @@ export type BucketProps = {
 
 export type OncoanalyserProps = {
   vpc?: ec2.IVpc | string;
+
+  pipelineQueueName: string;
+  pipelineJobDefinitionName: string;
   pipelineInstanceTypes: ec2.InstanceType[];
+  pipelineMaxCpus: number;
+
   taskInstanceTypes: ec2.InstanceType[];
-  maxPipelineCpus: number;
-  maxTaskCpus: number;
+  taskMaxCpus: number;
+
   bucket: BucketProps;
+
+  // the Git repo of oncoanalyser to launch from nextflow
+  gitRepo: string;
+  gitBranch: string;
 };
 
 export class Oncoanalyser extends Construct {
@@ -56,7 +65,6 @@ export class Oncoanalyser extends Construct {
 
     // Create Batch resources and co for Nextflow ***task*** jobs
     const roleBatchInstanceTask = new iam.Role(this, "BatchInstanceRoleTask", {
-      roleName: "batch-instance-role-task",
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("ec2.amazonaws.com"),
         new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
@@ -84,7 +92,7 @@ export class Oncoanalyser extends Construct {
         instanceRole: roleBatchInstanceTask,
         instanceTypes: props.taskInstanceTypes,
         launchTemplate: launchTemplateTask,
-        maxvCpus: props.maxTaskCpus,
+        maxvCpus: props.taskMaxCpus,
         securityGroups: [],
         useOptimalInstanceClasses: false,
         vpc: vpc,
@@ -95,7 +103,6 @@ export class Oncoanalyser extends Construct {
     );
 
     const jobQueueTask = new batch.JobQueue(this, "JobQueueTask", {
-      jobQueueName: "oncoanalyser-tasks",
       computeEnvironments: [
         { computeEnvironment: computeEnvironmentTask, order: 1 },
       ],
@@ -106,7 +113,6 @@ export class Oncoanalyser extends Construct {
       this,
       "BatchInstanceRolePipeline",
       {
-        roleName: "batch-instance-role-pipeline",
         assumedBy: new iam.CompositePrincipal(
           new iam.ServicePrincipal("ec2.amazonaws.com"),
           new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
@@ -254,7 +260,7 @@ export class Oncoanalyser extends Construct {
           instanceRole: roleBatchInstancePipeline,
           instanceTypes: props.pipelineInstanceTypes,
           launchTemplate: launchTemplatePipeline,
-          maxvCpus: props.maxPipelineCpus,
+          maxvCpus: props.pipelineMaxCpus,
           securityGroups: [],
           useOptimalInstanceClasses: false,
           vpc: vpc,
@@ -265,7 +271,7 @@ export class Oncoanalyser extends Construct {
       );
 
     const jobQueuePipeline = new batch.JobQueue(this, "JobQueuePipeline", {
-      jobQueueName: "oncoanalyser-pipeline",
+      jobQueueName: props.pipelineQueueName,
       computeEnvironments: [
         { computeEnvironment: computeEnvironmentPipeline, order: 1 },
       ],
@@ -277,6 +283,8 @@ export class Oncoanalyser extends Construct {
       platform: Platform.LINUX_AMD64,
       buildArgs: {
         NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(","),
+        SOFTWARE_GIT_REPO: props.gitRepo,
+        SOFTWARE_GIT_BRANCH: props.gitBranch
       },
     });
 
@@ -320,7 +328,7 @@ export class Oncoanalyser extends Construct {
 
     // Create job definition for pipeline execution
     const jobDefinition = new batch.EcsJobDefinition(this, "JobDefinition", {
-      jobDefinitionName: "oncoanalyser-job-definition",
+      jobDefinitionName: props.pipelineJobDefinitionName,
       container: new batch.EcsEc2ContainerDefinition(
         this,
         "EcsEc2ContainerDefinition",
