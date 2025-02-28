@@ -12,13 +12,6 @@ import { ContainerImage } from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { NextflowConfigConstruct } from "./nextflow-config-construct";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-
-import * as Handlebars from "handlebars";
-import * as ecrDeployment from "cdk-ecr-deployment";
-import { Aws } from "aws-cdk-lib";
-import { ContainerImage } from "aws-cdk-lib/aws-ecs";
-import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { NEXTFLOW_PLUGINS } from "./dependencies";
 
 export type BucketProps = {
@@ -280,11 +273,11 @@ export class Oncoanalyser extends Construct {
 
     // create Docker image for pipeline
     const image = new ecrAssets.DockerImageAsset(this, "DockerImage", {
-      directory: path.join(__dirname, 'resources'),
+      directory: path.join(__dirname, "resources"),
       platform: Platform.LINUX_AMD64,
       buildArgs: {
-        NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(",")
-      }
+        NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(","),
+      },
     });
 
     // Bucket permissions
