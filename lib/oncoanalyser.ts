@@ -8,7 +8,7 @@ import { NextflowConfigConstruct } from "./nextflow-config";
 import { OncoanalyserJobDefinition } from "./oncoanalyser-job-definition";
 import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 import { NextflowTaskEnvironment } from "./nextflow-task-environment";
-import { NextflowPipelineEnvironment } from "./nextflow-pipeine-environment";
+import { NextflowPipelineEnvironment } from "./nextflow-pipeline-environment";
 export interface BucketProps {
   readonly bucket: string;
   readonly inputPrefix: string;
@@ -17,20 +17,53 @@ export interface BucketProps {
 }
 
 export interface OncoanalyserProps {
+  /**
+   * The VPC to run the Oncoanalyser environment in.
+   */
   readonly vpc?: ec2.IVpc | string;
+  /**
+   * The name of the Nextflow pipeline job queue.
+   */
   readonly pipelineQueueName: string;
+  /**
+   * The name of the the job definition for Oncoanalyser to run.
+   */
   readonly pipelineJobDefinitionName: string;
+  /**
+   * The instance types to use for the pipeline jobs.
+   */
   readonly pipelineInstanceTypes: ec2.InstanceType[];
+  /**
+   * The maximum number of vCPUs that can be used for the batch pipeline.
+   */
   readonly pipelineMaxCpus: number;
+  /**
+   * The instance types to use for the Nextflow task jobs.
+   */
   readonly taskInstanceTypes: ec2.InstanceType[];
+  /**
+   * The maximum number of vCPUs that can be used for the batch tasks.
+   */
   readonly taskMaxCpus: number;
+  /*
+   * The S3 bucket to use for the Nextflow environment.
+   */
   readonly bucket: BucketProps;
-
-  // the Git repo of oncoanalyser to launch from nextflow
+  /**
+   * The git repository of oncoanalyser to launch from nextflow.
+   */
   readonly gitRepo: string;
+  /**
+   * The git branch of oncoanalyser to launch from nextflow.
+   */
   readonly gitBranch: string;
 }
 
+/**
+ * Create an Oncoanalyser environment. This will create the necessary
+ * resources to run the Oncoanalyser pipeline. You will only need this construct
+ * if you want to run the whole Oncoanalyser pipeline in your account.
+ */
 export class Oncoanalyser extends Construct {
   /**
    * The VPC that the Oncoanalyser batch environment is running in.
@@ -55,13 +88,13 @@ export class Oncoanalyser extends Construct {
 
     const nfBucket = s3.Bucket.fromBucketName(
       this,
-      "S3Bucket",
+      "NextflowBucket",
       props.bucket.bucket,
     );
 
     const nfTaskComputeEnv = new NextflowTaskEnvironment(
       this,
-      "nfTaskComputeEnvironment",
+      "NextflowTaskComputeEnvironment",
       {
         vpc: this.vpc,
         securityGroup: this.securityGroup,
@@ -132,7 +165,7 @@ export class Oncoanalyser extends Construct {
     new OncoanalyserJobDefinition(this, "OncoanalyserJobDefinition", {
       jobRole: nfPipelineComputeEnv.instanceRole,
       pipelineJobDefinitionName: props.pipelineJobDefinitionName,
-      environment: config.getEnvironmentVariables(),
+      environment: config.retrieveEnvironmentVariables(),
       gitRepo: props.gitRepo,
       gitBranch: props.gitBranch,
     });
