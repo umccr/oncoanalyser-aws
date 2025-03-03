@@ -34,6 +34,9 @@ export interface OncoanalyserJobDefinitionProps {
   readonly gitBranch: string;
 }
 
+/**
+ * Create a job definition for running Oncoanalyser in AWS Batch.
+ */
 export class OncoanalyserJobDefinition extends Construct {
   constructor(
     scope: Construct,

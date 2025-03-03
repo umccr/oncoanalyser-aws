@@ -14,6 +14,11 @@
     "url": "https://github.com/umccr/oncoanalyser-aws/issues"
   },
   "homepage": "https://github.com/umccr/oncoanalyser-aws#readme",
+  "keywords": [
+    "aws",
+    "cdk",
+    "oncoanalyser"
+  ],
   "stability": "stable",
   "scripts": {
     "test": "jest",
@@ -52,12 +57,7 @@
   "jsii": {
     "outdir": "dist",
     "versionFormat": "short",
-    "targets": {
-      "python": {
-        "module": "oncoanalyser_aws",
-        "distName": "oncoanalyser-aws"
-      }
-    }
+    "targets": {}
   },
   "main": "lib/index.js",
   "types": "lib/index.d.ts"

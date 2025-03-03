@@ -11,21 +11,41 @@ import { IJobQueue } from "aws-cdk-lib/aws-batch";
 import { Duration } from "aws-cdk-lib";
 import { NEXTFLOW_PLUGINS } from "../dependencies";
 
-export type NextflowConfigProps = {
-  bucket: BucketProps;
-  tasksInstanceRole: IRole;
-  tasksJobQueue: IJobQueue;
-
-  // if present and true, instructs the construct to make local ECR assets mirroring
-  // the standard task Docker images
-  // otherwise, the pipeline will launch Docker images directly from their
-  // public repository (like quay.io or dockerhub)
+export interface NextflowConfigProps {
+  /**
+   * The S3 bucket to use for the Nextflow environment.
+   */
+  readonly bucket: BucketProps;
+  /**
+   * The role to use for the tasks instance.
+   */
+  readonly tasksInstanceRole: IRole;
+  /**
+   * The job queue to use for the tasks.
+   */
+  readonly tasksJobQueue: IJobQueue;
+  /**
+   * If true, instructs the construct to make local ECR assets mirroring the standard task Docker images.
+   * otherwise, the pipeline will launch Docker images directly from their public repository (like quay.io or dockerhub)
+   */
   readonly copyToLocalEcr?: boolean;
-};
+}
 
+/**
+ * Construct that creates an AppConfig configuration for the Nextflow pipeline environment.
+ */
 export class NextflowConfigConstruct extends Construct {
+  /**
+   * The AppConfig application that is created.
+   */
   private readonly application: appconfig.Application;
+  /**
+   * The AppConfig environment that is created.
+   */
   private readonly environment: appconfig.Environment;
+  /**
+   * The AppConfig hosted configuration that is created.
+   */
   private readonly hostedConfiguration: appconfig.HostedConfiguration;
 
   constructor(scope: Construct, id: string, props: NextflowConfigProps) {
@@ -294,7 +314,7 @@ export class NextflowConfigConstruct extends Construct {
     //  );
   }
 
-  public getEnvironmentVariables(): Record<string, string> {
+  public retrieveEnvironmentVariables(): Record<string, string> {
     return {
       ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION:
         this.application.applicationId,
