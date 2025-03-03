@@ -1,5 +1,5 @@
-import { OncoanalyserProps } from "../lib";
-import { InstanceClass, InstanceSize, InstanceType } from "aws-cdk-lib/aws-ec2";
+import { OncoanalyserProps } from "../lib/oncoanalyser";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 
 /**
  * Configurable settings for the oncoanalyser construct.
