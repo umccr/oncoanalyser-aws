@@ -2,14 +2,14 @@ import { join } from "path";
 import { readFileSync } from "fs";
 import * as Handlebars from "handlebars";
 import { Construct } from "constructs";
-import { BucketProps } from "./application-stack";
+import { BucketProps } from "../oncoanalyser";
 import * as appconfig from "aws-cdk-lib/aws-appconfig";
 import { DeletionProtectionCheck } from "aws-cdk-lib/aws-appconfig";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { IJobQueue } from "aws-cdk-lib/aws-batch";
 import { Duration } from "aws-cdk-lib";
-import { NEXTFLOW_PLUGINS } from "./dependencies";
+import { NEXTFLOW_PLUGINS } from "../dependencies";
 
 export type NextflowConfigProps = {
   bucket: BucketProps;
@@ -49,7 +49,7 @@ export class NextflowConfigConstruct extends Construct {
         // docker image - but is maintained as an asset within the CDK setup
         // this means CDK will handle deploying it to ECR for us
         const imageAsset = new DockerImageAsset(this, configName, {
-          directory: join(__dirname, "task_docker_images"),
+          directory: join(__dirname),
           platform: Platform.LINUX_AMD64,
           // because the image base name is passed into Docker - the actual Docker checksum
           // itself won't change even when the image base does... so we need to add the name/tag into the hash
@@ -237,7 +237,7 @@ export class NextflowConfigConstruct extends Construct {
     );
 
     const nextflowConfigTemplate = readFileSync(
-      join(__dirname, "resources/nextflow_aws.template.config"),
+      join(__dirname, "..", "nextflow_aws.template.config"),
       { encoding: "utf-8" },
     );
     const nextflowConfigTemplateCompiled = Handlebars.compile(
