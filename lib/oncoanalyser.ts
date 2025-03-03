@@ -60,9 +60,7 @@ export interface OncoanalyserProps {
 }
 
 /**
- * Create an Oncoanalyser environment. This will create the necessary
- * resources to run the Oncoanalyser pipeline. You will only need this construct
- * if you want to run the whole Oncoanalyser pipeline in your account.
+ * In general you would only need this construct to create the Oncoanalyser environment.
  */
 export class Oncoanalyser extends Construct {
   /**
