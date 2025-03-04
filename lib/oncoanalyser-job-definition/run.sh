@@ -46,12 +46,12 @@ output_base=$(jq -r .outdir params.json)
 # for the moment appconfig is overkill - but it does open up the possibility of things
 # like feature flags etc
 appconfig_token=$(aws appconfigdata start-configuration-session \
-                    --application-identifier $ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION \
-                    --environment-identifier $ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_ENVIRONMENT \
-                    --configuration-profile-identifier $ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_CONFIGURATION_PROFILE \
+                    --application-identifier "$ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION" \
+                    --environment-identifier "$ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_ENVIRONMENT" \
+                    --configuration-profile-identifier "$ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_CONFIGURATION_PROFILE" \
                     --query InitialConfigurationToken --output text)
 
-aws appconfigdata get-latest-configuration --configuration-token $appconfig_token aws.config
+aws appconfigdata get-latest-configuration --configuration-token "$appconfig_token" aws.config
 
 # Set additional Nextflow arguments
 nf_arg_stub=''

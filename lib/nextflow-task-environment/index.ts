@@ -48,6 +48,10 @@ export interface NextflowTaskEnvironmentProps {
    * The patterns to grant read-write access to the bucket.
    */
   readonly nfBucketGrantReadWrite?: string[];
+  /**
+   * The launch template content for the underlying batch instances
+   */
+  readonly launchTemplateContent: string;
 }
 
 /**
@@ -95,6 +99,7 @@ export class NextflowTaskEnvironment extends Construct {
         instanceRole: this.instanceRole,
         instanceTypes: props.instanceTypes,
         launchTemplate: createLaunchTemplate(this, {
+          content: props.launchTemplateContent,
           securityGroup: props.securityGroup,
           launchTemplateName: "oncoanalyser-task",
         }),

@@ -9,6 +9,11 @@ import { OncoanalyserJobDefinition } from "./oncoanalyser-job-definition";
 import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 import { NextflowTaskEnvironment } from "./nextflow-task-environment";
 import { NextflowPipelineEnvironment } from "./nextflow-pipeline-environment";
+import { readFileSync } from "fs";
+import * as Handlebars from "handlebars";
+import { join } from "path";
+import { AWS_CLI_BASE_PATH, SCRATCH_BASE_PATH } from "./dependencies";
+
 export interface BucketProps {
   readonly bucket: string;
   readonly inputPrefix: string;
@@ -57,6 +62,15 @@ export interface OncoanalyserProps {
    * The git branch of oncoanalyser to launch from nextflow.
    */
   readonly gitBranch: string;
+  /**
+   * If true, instructs the construct to re-deploy all Task images from
+   * their normal source (quay.io etc) to ECR. This will make
+   * the initial build much slower, but will then use the Docker cache
+   * and will make all executions of the tasks entirely local to AWS.
+   * If absent or false, then the default docker task URIs will be used
+   * and pulled from the remote sources at runtime.
+   */
+  readonly copyToLocalEcr?: boolean;
 }
 
 /**
@@ -90,6 +104,21 @@ export class Oncoanalyser extends Construct {
       props.bucket.bucket,
     );
 
+    const launchTemplateTemplate = readFileSync(
+      join(__dirname, "ec2-user-data.template.txt"),
+      { encoding: "utf-8" },
+    );
+    const launchTemplateCompiled = Handlebars.compile(launchTemplateTemplate, {
+      strict: true,
+    });
+    const launchTemplateContent = launchTemplateCompiled(
+      {
+        AWS_CLI_BASE_PATH: AWS_CLI_BASE_PATH,
+        SCRATCH_BASE_PATH: SCRATCH_BASE_PATH,
+      },
+      {},
+    );
+
     const nfTaskComputeEnv = new NextflowTaskEnvironment(
       this,
       "NextflowTaskComputeEnvironment",
@@ -104,6 +133,7 @@ export class Oncoanalyser extends Construct {
           `${props.bucket.refDataPrefix}/*`,
         ],
         nfBucketGrantReadWrite: [`${props.bucket.outputPrefix}/*`],
+        launchTemplateContent: launchTemplateContent,
       },
     );
 
@@ -150,6 +180,7 @@ export class Oncoanalyser extends Construct {
             ],
           }),
         ],
+        launchTemplateContent: launchTemplateContent,
       },
     );
 
@@ -157,7 +188,7 @@ export class Oncoanalyser extends Construct {
       bucket: props.bucket,
       tasksInstanceRole: nfTaskComputeEnv.instanceRole,
       tasksJobQueue: nfTaskComputeEnv.jobQueue,
-      copyToLocalEcr: false,
+      copyToLocalEcr: props.copyToLocalEcr,
     });
 
     new OncoanalyserJobDefinition(this, "OncoanalyserJobDefinition", {

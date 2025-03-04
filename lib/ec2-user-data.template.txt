@@ -20,8 +20,7 @@ Content-Type: text/x-shellscript; charset="us-ascii"
 curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
 unzip -q /tmp/awscliv2.zip -d /tmp/
 
-/tmp/aws/install --install-dir /opt/awscliv2/aws-cli/ --bin-dir /opt/awscliv2/bin/
-ln -s /opt/awscliv2/bin/aws /usr/local/bin/
+/tmp/aws/install --install-dir {{AWS_CLI_BASE_PATH}}/aws-cli/ --bin-dir {{AWS_CLI_BASE_PATH}}/bin/
 
 git clone https://github.com/awslabs/amazon-ebs-autoscale /tmp/amazon-ebs-autoscale/
 (cd /tmp/amazon-ebs-autoscale/ && git checkout 6db0c70)
