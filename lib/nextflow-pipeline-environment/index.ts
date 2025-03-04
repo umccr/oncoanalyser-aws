@@ -60,6 +60,10 @@ export interface NextflowPipelineEnvironmentProps {
    * Additional policies to attach to the instance role.
    */
   readonly additionalInstanceRolePolicies?: Policy[];
+  /**
+   * The launch template content for the underlying batch instances
+   */
+  readonly launchTemplateContent: string;
 }
 
 /**
@@ -100,6 +104,7 @@ export class NextflowPipelineEnvironment extends Construct {
         instanceRole: this.instanceRole,
         instanceTypes: props.instanceTypes,
         launchTemplate: createLaunchTemplate(this, {
+          content: props.launchTemplateContent,
           securityGroup: props.securityGroup,
           launchTemplateName: "oncoanalyser-pipeline",
         }),
