@@ -18,8 +18,10 @@ jobs:
 
       - run: npm install
 
+      # fix package version to match release version
+      - run: npm version ${{github.ref_name}}
+        
       # build and package
-
       - run: npm run build
 
       - run: npm run package
