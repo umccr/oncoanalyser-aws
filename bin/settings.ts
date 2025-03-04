@@ -1,10 +1,12 @@
-import { OncoanalyserProps } from "../lib/oncoanalyser";
-import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { OncoanalyserProps } from "../lib";
+import { InstanceClass, InstanceSize, InstanceType } from "aws-cdk-lib/aws-ec2";
 
 /**
  * Configurable settings for the oncoanalyser construct.
  */
 export const SETTINGS: OncoanalyserProps = {
+  // use the default VPC of the account
+  vpc: undefined,
   bucket: {
     bucket: "umccr-temp-dev",
     inputPrefix: "inputs",
@@ -17,14 +19,11 @@ export const SETTINGS: OncoanalyserProps = {
   pipelineMaxCpus: 2,
   taskMaxCpus: 4,
   pipelineInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
+    InstanceType.of(InstanceClass.R6A, InstanceSize.LARGE),
   ],
   pipelineQueueName: "oncoanalyser-pipeline",
   pipelineJobDefinitionName: "oncoanalyser-job-definition",
-  taskInstanceTypes: [
-    ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.XLARGE),
-  ],
-  vpc: undefined,
+  taskInstanceTypes: [InstanceType.of(InstanceClass.R6I, InstanceSize.XLARGE)],
   gitRepo: "https://github.com/scwatts/oncoanalyser-aws-stack-testing",
   gitBranch: "aws-stack-testing",
 };
