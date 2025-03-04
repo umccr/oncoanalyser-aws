@@ -1,4 +1,4 @@
-import { OncoanalyserProps } from "../lib/application-stack";
+import { OncoanalyserProps } from "../lib/oncoanalyser";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 
 /**
@@ -19,12 +19,12 @@ export const SETTINGS: OncoanalyserProps = {
   pipelineInstanceTypes: [
     ec2.InstanceType.of(ec2.InstanceClass.R6A, ec2.InstanceSize.LARGE),
   ],
-  pipelineQueueName:  "oncoanalyser-pipeline",
+  pipelineQueueName: "oncoanalyser-pipeline",
   pipelineJobDefinitionName: "oncoanalyser-job-definition",
   taskInstanceTypes: [
     ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.XLARGE),
   ],
   vpc: undefined,
   gitRepo: "https://github.com/scwatts/oncoanalyser-aws-stack-testing",
-  gitBranch: "aws-stack-testing"
+  gitBranch: "aws-stack-testing",
 };

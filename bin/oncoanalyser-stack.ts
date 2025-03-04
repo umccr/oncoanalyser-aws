@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
 
-import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
-import { Oncoanalyser, OncoanalyserProps } from "../lib/application-stack";
+import { Oncoanalyser, OncoanalyserProps } from "../lib/oncoanalyser";
 import { SETTINGS } from "./settings";
 
 export class OncoanalyserStack extends cdk.Stack {

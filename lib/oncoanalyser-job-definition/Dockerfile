@@ -30,8 +30,8 @@ RUN nextflow plugin install ${NEXTFLOW_PLUGINS}
 RUN \
   git clone -b ${SOFTWARE_GIT_BRANCH} ${SOFTWARE_GIT_REPO} /root/pipeline/software/oncoanalyser/
 
+# The dockerfile should be executed one level above the oncoanalyser-job-definition directory 
 COPY nextflow_aws.template.config /root/pipeline/other/
-
-COPY run.sh /root/pipeline/other/
+COPY oncoanalyser-job-definition/run.sh /root/pipeline/other/
 
 WORKDIR /root/pipeline/

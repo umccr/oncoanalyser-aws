@@ -2,30 +2,50 @@ import { join } from "path";
 import { readFileSync } from "fs";
 import * as Handlebars from "handlebars";
 import { Construct } from "constructs";
-import { BucketProps } from "./application-stack";
+import { BucketProps } from "../oncoanalyser";
 import * as appconfig from "aws-cdk-lib/aws-appconfig";
 import { DeletionProtectionCheck } from "aws-cdk-lib/aws-appconfig";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { IJobQueue } from "aws-cdk-lib/aws-batch";
 import { Duration } from "aws-cdk-lib";
-import { NEXTFLOW_PLUGINS } from "./dependencies";
+import { NEXTFLOW_PLUGINS } from "../dependencies";
 
-export type NextflowConfigProps = {
-  bucket: BucketProps;
-  tasksInstanceRole: IRole;
-  tasksJobQueue: IJobQueue;
-
-  // if present and true, instructs the construct to make local ECR assets mirroring
-  // the standard task Docker images
-  // otherwise, the pipeline will launch Docker images directly from their
-  // public repository (like quay.io or dockerhub)
+export interface NextflowConfigProps {
+  /**
+   * The S3 bucket to use for the Nextflow environment.
+   */
+  readonly bucket: BucketProps;
+  /**
+   * The role to use for the tasks instance.
+   */
+  readonly tasksInstanceRole: IRole;
+  /**
+   * The job queue to use for the tasks.
+   */
+  readonly tasksJobQueue: IJobQueue;
+  /**
+   * If true, instructs the construct to make local ECR assets mirroring the standard task Docker images.
+   * otherwise, the pipeline will launch Docker images directly from their public repository (like quay.io or dockerhub)
+   */
   readonly copyToLocalEcr?: boolean;
-};
+}
 
+/**
+ * Construct that creates an AppConfig configuration for the Nextflow pipeline environment.
+ */
 export class NextflowConfigConstruct extends Construct {
+  /**
+   * The AppConfig application that is created.
+   */
   private readonly application: appconfig.Application;
+  /**
+   * The AppConfig environment that is created.
+   */
   private readonly environment: appconfig.Environment;
+  /**
+   * The AppConfig hosted configuration that is created.
+   */
   private readonly hostedConfiguration: appconfig.HostedConfiguration;
 
   constructor(scope: Construct, id: string, props: NextflowConfigProps) {
@@ -49,7 +69,7 @@ export class NextflowConfigConstruct extends Construct {
         // docker image - but is maintained as an asset within the CDK setup
         // this means CDK will handle deploying it to ECR for us
         const imageAsset = new DockerImageAsset(this, configName, {
-          directory: join(__dirname, "task_docker_images"),
+          directory: join(__dirname),
           platform: Platform.LINUX_AMD64,
           // because the image base name is passed into Docker - the actual Docker checksum
           // itself won't change even when the image base does... so we need to add the name/tag into the hash
@@ -237,7 +257,7 @@ export class NextflowConfigConstruct extends Construct {
     );
 
     const nextflowConfigTemplate = readFileSync(
-      join(__dirname, "resources/nextflow_aws.template.config"),
+      join(__dirname, "..", "nextflow_aws.template.config"),
       { encoding: "utf-8" },
     );
     const nextflowConfigTemplateCompiled = Handlebars.compile(
@@ -294,7 +314,7 @@ export class NextflowConfigConstruct extends Construct {
     //  );
   }
 
-  public getEnvironmentVariables(): Record<string, string> {
+  public retrieveEnvironmentVariables(): Record<string, string> {
     return {
       ONCOANALYSER_NEXTFLOW_CONFIG_APPCONFIG_APPLICATION:
         this.application.applicationId,
