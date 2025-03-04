@@ -189,6 +189,29 @@ export class NextflowPipelineEnvironment extends Construct {
       ],
     });
 
+    new Policy(this, "PipelinePolicyEBSAutoscale", {
+      roles: [this.instanceRole],
+      statements: [
+        new PolicyStatement({
+          actions: [
+            "ec2:CreateVolume",
+            "ec2:AttachVolume",
+            "ec2:DetachVolume",
+            "ec2:DeleteVolume",
+            "ec2:DescribeVolumes",
+            "ec2:DescribeVolumeStatus",
+            "ec2:DescribeInstanceAttribute",
+            "ec2:ModifyInstanceAttribute",
+            "ec2:DescribeInstances",
+            "ec2:DescribeTags",
+            "ec2:CreateTags",
+          ],
+          resources: ["*"],
+        }),
+      ],
+    });
+
+
     new Policy(this, "PipelinePolicyECR", {
       roles: [instanceRole],
       statements: [
