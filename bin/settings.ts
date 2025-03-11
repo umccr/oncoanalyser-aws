@@ -7,11 +7,23 @@ import { InstanceClass, InstanceSize, InstanceType } from "aws-cdk-lib/aws-ec2";
 export const SETTINGS: OncoanalyserProps = {
   // use the default VPC of the account
   vpc: undefined,
-  bucket: {
-    bucket: "umccr-temp-dev",
-    inputPrefix: "inputs",
-    outputPrefix: "outputs",
-    refDataPrefix: "refdata",
+  buckets: {
+    inputBucket: {
+      name: "umccr-temp-dev",
+      prefix: "inputs",
+      importExisting: true,
+    },
+    outputBucket: {
+      name: "umccr-temp-dev",
+      prefix: "outputs",
+      importExisting: true,
+    },
+    referenceBucket: {
+      name: "umccr-temp-dev",
+      prefix: "refdata",
+      importExisting: true,
+      readOnly: false,
+    },
   },
   // NOTE(SW): temporary reduction for testing during dev
   //pipelineMaxCpus: 64,

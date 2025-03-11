@@ -7,8 +7,9 @@ print_help_text() {
 Usage example: run.sh --params_fp FILE
 
 Options:
-  --params_fp FILE    S3 path to the Nextflow JSON params file
-  --stub_run          Enable stub run
+  --params_fp FILE            S3 path to the Nextflow JSON params file
+  --stub_run                  Enable stub run
+  --prepare_reference_only    Prepare the reference data only
 EOF
 }
 
@@ -21,6 +22,10 @@ while [ $# -gt 0 ]; do
 
     --stub_run)
       stub_run='true';
+    ;;
+
+    --prepare_reference_only)
+      prepare_reference_only='true';
     ;;
 
     -h|--help)
@@ -59,6 +64,11 @@ if [[ -n ${stub_run:-} ]]; then
   nf_arg_stub='-stub'
 fi
 
+nf_arg_prep_ref=''
+if [[ -n ${prepare_reference_only:-} ]]; then
+  nf_arg_prep_ref='--prepare_reference_only'
+fi
+
 # Run oncoanalyser
 upload_data() {
   aws s3 sync \
@@ -77,6 +87,7 @@ nextflow run software/oncoanalyser/main.nf \
   -params-file params.json \
   -profile docker \
   ${nf_arg_stub} \
+  ${nf_arg_prep_ref} \
   -work-dir ${output_base%/}/work/ \
   -ansi-log false \
   --monochrome_logs \

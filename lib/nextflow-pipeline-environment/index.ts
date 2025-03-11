@@ -21,7 +21,6 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { createLaunchTemplate } from "../utils";
-import { IBucket } from "aws-cdk-lib/aws-s3";
 
 export interface NextflowPipelineEnvironmentProps {
   /**
@@ -44,18 +43,6 @@ export interface NextflowPipelineEnvironmentProps {
    * The maximum number of vCPUs that can be used by the compute environment.
    */
   readonly taskMaxCpus: number;
-  /**
-   * The S3 bucket to use for the Nextflow environment.
-   */
-  readonly nfBucket: IBucket;
-  /**
-   * The patterns to grant read access to the bucket.
-   */
-  readonly nfBucketGrantRead?: string[];
-  /**
-   * The patterns to grant read-write access to the bucket.
-   */
-  readonly nfBucketGrantReadWrite?: string[];
   /**
    * Additional policies to attach to the instance role.
    */
@@ -124,17 +111,6 @@ export class NextflowPipelineEnvironment extends Construct {
         { computeEnvironment: this.computeEnvironmentPipeline, order: 1 },
       ],
     });
-    if (props.nfBucketGrantRead) {
-      for (const pattern of props.nfBucketGrantRead) {
-        props.nfBucket.grantRead(this.instanceRole, pattern);
-      }
-    }
-
-    if (props.nfBucketGrantReadWrite) {
-      for (const pattern of props.nfBucketGrantReadWrite) {
-        props.nfBucket.grantReadWrite(this.instanceRole, pattern);
-      }
-    }
   }
 
   private addAdditionalPolicies(policies: Policy[]) {
@@ -207,7 +183,7 @@ export class NextflowPipelineEnvironment extends Construct {
             "ec2:DescribeVolumeAttribute",
             "ec2:CreateVolume",
             "ec2:DeleteVolume",
-            "ec2:CreateTags"
+            "ec2:CreateTags",
           ],
           resources: ["*"],
         }),

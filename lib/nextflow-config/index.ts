@@ -2,7 +2,6 @@ import { join } from "path";
 import { readFileSync } from "fs";
 import * as Handlebars from "handlebars";
 import { Construct } from "constructs";
-import { BucketProps } from "../oncoanalyser";
 import * as appconfig from "aws-cdk-lib/aws-appconfig";
 import { DeletionProtectionCheck } from "aws-cdk-lib/aws-appconfig";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
@@ -14,12 +13,13 @@ import {
   NEXTFLOW_PLUGINS,
   SCRATCH_BASE_PATH,
 } from "../dependencies";
+import { OncoanalyserWorkflowBuckets } from "../oncoanalyser-bucket";
 
 export interface NextflowConfigProps {
   /**
    * The S3 bucket to use for the Nextflow environment.
    */
-  readonly bucket: BucketProps;
+  readonly buckets: OncoanalyserWorkflowBuckets;
   /**
    * The role to use for the tasks instance.
    */
@@ -125,8 +125,8 @@ export class NextflowConfigConstruct extends Construct {
     const subs: Record<string, any> = {
       BATCH_INSTANCE_TASK_ROLE_ARN: props.tasksInstanceRole.roleArn,
       BATCH_JOB_QUEUE_NAME: props.tasksJobQueue.jobQueueName,
-      S3_BUCKET_NAME: props.bucket.bucket,
-      S3_BUCKET_REFDATA_PREFIX: props.bucket.refDataPrefix,
+      S3_BUCKET_NAME: props.buckets.inputBucket.bucket.bucketName,
+      // S3_BUCKET_REFDATA_PREFIX: props.buckets.referenceDataBucket.,
       PLUGINS: NEXTFLOW_PLUGINS,
       AWS_CLI_BASE_PATH: AWS_CLI_BASE_PATH,
       SCRATCH_BASE_PATH: SCRATCH_BASE_PATH,
@@ -297,7 +297,9 @@ export class NextflowConfigConstruct extends Construct {
    */
   private processTemplate(templatePath: string): string {
     const templateContent = readFileSync(templatePath, { encoding: "utf-8" });
-    const templateCompiled = Handlebars.compile(templateContent, { strict: true });
+    const templateCompiled = Handlebars.compile(templateContent, {
+      strict: true,
+    });
     return templateCompiled(this.substitutions, {});
   }
 }

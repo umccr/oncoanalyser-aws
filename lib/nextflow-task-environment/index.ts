@@ -17,7 +17,6 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { createLaunchTemplate } from "../utils";
-import { IBucket } from "aws-cdk-lib/aws-s3";
 
 export interface NextflowTaskEnvironmentProps {
   /**
@@ -36,18 +35,6 @@ export interface NextflowTaskEnvironmentProps {
    * The maximum number of vCPUs that can be used by the compute environment.
    */
   readonly taskMaxCpus: number;
-  /**
-   * The S3 bucket to use for the Nextflow environment.
-   */
-  readonly nfBucket: IBucket;
-  /**
-   * The patterns to grant read access to the bucket.
-   */
-  readonly nfBucketGrantRead?: string[];
-  /**
-   * The patterns to grant read-write access to the bucket.
-   */
-  readonly nfBucketGrantReadWrite?: string[];
   /**
    * The launch template content for the underlying batch instances
    */
@@ -118,17 +105,5 @@ export class NextflowTaskEnvironment extends Construct {
         { computeEnvironment: this.computeEnvironmentTask, order: 1 },
       ],
     });
-
-    if (props.nfBucketGrantRead) {
-      for (const pattern of props.nfBucketGrantRead) {
-        props.nfBucket.grantRead(this.instanceRole, pattern);
-      }
-    }
-
-    if (props.nfBucketGrantReadWrite) {
-      for (const pattern of props.nfBucketGrantReadWrite) {
-        props.nfBucket.grantReadWrite(this.instanceRole, pattern);
-      }
-    }
   }
 }

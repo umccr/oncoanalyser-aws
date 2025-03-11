@@ -2,24 +2,20 @@ import { Construct } from "constructs";
 
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as s3 from "aws-cdk-lib/aws-s3";
 import { Aws } from "aws-cdk-lib";
 import { NextflowConfigConstruct } from "./nextflow-config";
 import { OncoanalyserJobDefinition } from "./oncoanalyser-job-definition";
 import { IVpc, Vpc } from "aws-cdk-lib/aws-ec2";
 import { NextflowTaskEnvironment } from "./nextflow-task-environment";
 import { NextflowPipelineEnvironment } from "./nextflow-pipeline-environment";
-import { readFileSync } from "fs";
 import * as Handlebars from "handlebars";
-import { join } from "path";
 import { AWS_CLI_BASE_PATH, SCRATCH_BASE_PATH } from "./dependencies";
-
-export interface BucketProps {
-  readonly bucket: string;
-  readonly inputPrefix: string;
-  readonly outputPrefix: string;
-  readonly refDataPrefix: string;
-}
+import {
+  OncoanalyserWorkflowBuckets,
+  OncoanalyserWorkflowBucketsConfig,
+} from "./oncoanalyser-bucket";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export interface OncoanalyserProps {
   /**
@@ -31,7 +27,7 @@ export interface OncoanalyserProps {
    */
   readonly pipelineQueueName: string;
   /**
-   * The name of the the job definition for Oncoanalyser to run.
+   * The name of the job definition for Oncoanalyser to run.
    */
   readonly pipelineJobDefinitionName: string;
   /**
@@ -50,10 +46,10 @@ export interface OncoanalyserProps {
    * The maximum number of vCPUs that can be used for the batch tasks.
    */
   readonly taskMaxCpus: number;
-  /*
-   * The S3 bucket to use for the Nextflow environment.
+  /**
+   * Bucket configuration.
    */
-  readonly bucket: BucketProps;
+  readonly buckets: OncoanalyserWorkflowBucketsConfig;
   /**
    * The git repository of oncoanalyser to launch from nextflow.
    */
@@ -98,12 +94,6 @@ export class Oncoanalyser extends Construct {
       vpc: this.vpc,
     });
 
-    const nfBucket = s3.Bucket.fromBucketName(
-      this,
-      "NextflowBucket",
-      props.bucket.bucket,
-    );
-
     const launchTemplateTemplate = readFileSync(
       join(__dirname, "ec2-user-data.template.txt"),
       { encoding: "utf-8" },
@@ -127,12 +117,6 @@ export class Oncoanalyser extends Construct {
         securityGroup: this.securityGroup,
         instanceTypes: props.taskInstanceTypes,
         taskMaxCpus: props.taskMaxCpus,
-        nfBucket: nfBucket,
-        nfBucketGrantRead: [
-          `${props.bucket.inputPrefix}/*`,
-          `${props.bucket.refDataPrefix}/*`,
-        ],
-        nfBucketGrantReadWrite: [`${props.bucket.outputPrefix}/*`],
         launchTemplateContent: launchTemplateContent,
       },
     );
@@ -146,12 +130,6 @@ export class Oncoanalyser extends Construct {
         pipelineQueueName: props.pipelineQueueName,
         instanceTypes: props.pipelineInstanceTypes,
         taskMaxCpus: props.pipelineMaxCpus,
-        nfBucket: nfBucket,
-        nfBucketGrantRead: [
-          `${props.bucket.inputPrefix}/*`,
-          `${props.bucket.refDataPrefix}/*`,
-        ],
-        nfBucketGrantReadWrite: [`${props.bucket.outputPrefix}/*`],
         additionalInstanceRolePolicies: [
           new iam.Policy(this, "PipelinePolicyBatchJobs", {
             statements: [
@@ -184,8 +162,14 @@ export class Oncoanalyser extends Construct {
       },
     );
 
+    const buckets = new OncoanalyserWorkflowBuckets(this, "Buckets", {
+      ...props.buckets,
+      taskComputeEnvRole: nfTaskComputeEnv.instanceRole,
+      pipelineComputeEnvRole: nfPipelineComputeEnv.instanceRole,
+    });
+
     const config = new NextflowConfigConstruct(this, "NextflowConfig", {
-      bucket: props.bucket,
+      buckets,
       tasksInstanceRole: nfTaskComputeEnv.instanceRole,
       tasksJobQueue: nfTaskComputeEnv.jobQueue,
       copyToLocalEcr: props.copyToLocalEcr,
