@@ -125,8 +125,7 @@ export class NextflowConfigConstruct extends Construct {
     const subs: Record<string, any> = {
       BATCH_INSTANCE_TASK_ROLE_ARN: props.tasksInstanceRole.roleArn,
       BATCH_JOB_QUEUE_NAME: props.tasksJobQueue.jobQueueName,
-      S3_BUCKET_NAME: props.buckets.inputBucket.bucket.bucketName,
-      // S3_BUCKET_REFDATA_PREFIX: props.buckets.referenceDataBucket.,
+      S3_REFDATA_URI: props.buckets.referenceDataBucket.formatS3Uri(),
       PLUGINS: NEXTFLOW_PLUGINS,
       AWS_CLI_BASE_PATH: AWS_CLI_BASE_PATH,
       SCRATCH_BASE_PATH: SCRATCH_BASE_PATH,

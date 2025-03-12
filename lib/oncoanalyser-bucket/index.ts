@@ -182,6 +182,10 @@ export class OncoanalyserBucket extends Construct {
    * The configured bucket.
    */
   readonly bucket: IBucket;
+  /**
+   * The prefix if it was configured.
+   */
+  readonly prefix?: string;
 
   constructor(scope: Construct, id: string, props: OncoanalyserBucketProps) {
     super(scope, id);
@@ -203,8 +207,10 @@ export class OncoanalyserBucket extends Construct {
       });
     }
 
+    this.prefix = props.prefix;
+
     const keyPattern =
-      props.prefix !== undefined ? `${props.prefix}/*` : undefined;
+      props.prefix !== undefined ? `${this.prefix}/*` : undefined;
     if (props.grantRead !== undefined) {
       this.grantRead(props.grantRead, keyPattern);
     }
@@ -229,5 +235,17 @@ export class OncoanalyserBucket extends Construct {
     grantables.forEach((grantable) =>
       this.bucket.grantWrite(grantable, keyPattern),
     );
+  }
+
+  /**
+   * Format an S3 URI using the bucket and prefix, i.e. outputs `s3://bucketName/prefix`.
+   */
+  formatS3Uri(): string {
+    let uri = this.bucket.bucketName;
+    if (this.prefix !== undefined) {
+      uri = `${uri}/${this.prefix}`;
+    }
+
+    return `s3://${uri}`;
   }
 }

@@ -181,6 +181,7 @@ export class Oncoanalyser extends Construct {
       environment: config.retrieveEnvironmentVariables(),
       gitRepo: props.gitRepo,
       gitBranch: props.gitBranch,
+      buckets,
     });
   }
 

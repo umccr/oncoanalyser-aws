@@ -10,6 +10,7 @@ import {
 import { ContainerImage } from "aws-cdk-lib/aws-ecs";
 import { Size } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
+import { OncoanalyserWorkflowBuckets } from "../oncoanalyser-bucket";
 
 export interface OncoanalyserJobDefinitionProps {
   /**
@@ -32,6 +33,10 @@ export interface OncoanalyserJobDefinitionProps {
    * The git branch of oncoanalyser to launch from nextflow.
    */
   readonly gitBranch: string;
+  /**
+   * The workflow buckets.
+   */
+  readonly buckets: OncoanalyserWorkflowBuckets;
 }
 
 /**
@@ -54,6 +59,7 @@ export class OncoanalyserJobDefinition extends Construct {
         NEXTFLOW_PLUGINS: NEXTFLOW_PLUGINS.join(","),
         SOFTWARE_GIT_REPO: props.gitRepo,
         SOFTWARE_GIT_BRANCH: props.gitBranch,
+        S3_REFDATA_URI: props.buckets.referenceDataBucket.formatS3Uri(),
       },
     });
 
