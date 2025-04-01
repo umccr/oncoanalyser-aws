@@ -179,7 +179,7 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "ESVEE_DOCKER_IMAGE_URI",
-      "ghcr.io/umccr/hmftools/hmftools-esvee:aarch64",
+      "ghcr.io/umccr/hmftools/hmftools-esvee:1.0.2-aarch64",
     );
     fixConfigSectionForTask(
       "SAMBAMBA_DOCKER_IMAGE_URI",
