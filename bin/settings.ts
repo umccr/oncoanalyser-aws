@@ -18,12 +18,13 @@ export const SETTINGS: OncoanalyserProps = {
   //taskMaxCpus: 256,
   pipelineMaxCpus: 2,
   taskMaxCpus: 4,
+  copyToLocalEcr: true,
   pipelineInstanceTypes: [
-    InstanceType.of(InstanceClass.R6A, InstanceSize.LARGE),
+    InstanceType.of(InstanceClass.R8G, InstanceSize.XLARGE),
   ],
   pipelineQueueName: "oncoanalyser-pipeline",
   pipelineJobDefinitionName: "oncoanalyser-job-definition",
-  taskInstanceTypes: [InstanceType.of(InstanceClass.R6I, InstanceSize.XLARGE)],
+  taskInstanceTypes: [InstanceType.of(InstanceClass.R8G, InstanceSize.XLARGE)],
   gitRepo: "https://github.com/scwatts/oncoanalyser-aws-stack-testing",
   gitBranch: "aws-stack-testing",
 };

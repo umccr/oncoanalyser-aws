@@ -144,7 +144,7 @@ export class NextflowConfigConstruct extends Construct {
         // this means CDK will handle deploying it to ECR for us
         const imageAsset = new DockerImageAsset(this, configName, {
           directory: join(__dirname, "thin-docker"),
-          platform: Platform.LINUX_AMD64,
+          platform: Platform.LINUX_ARM64,
           // because the image base name is passed into Docker - the actual Docker checksum
           // itself won't change even when the image base does... so we need to add the name/tag into the hash
           extraHash: dockerImageUri,

@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "22.7.9",
-    "aws-cdk": "2.1002.0",
+    "aws-cdk": "^2.1003.0",
     "aws-cdk-lib": "2.181.1",
     "constructs": "10.4.2",
     "jsii": "5.7.7",
@@ -37,6 +37,7 @@
     "prettier": "3.5.3",
     "publib": "0.2.956",
     "ts-node": "10.9.2",
+    "tsx": "^4.19.3",
     "typescript": "5.8.2"
   },
   "bundledDependencies": [
@@ -55,5 +56,8 @@
     "targets": {}
   },
   "main": "lib/index.js",
-  "types": "lib/index.d.ts"
+  "types": "lib/index.d.ts",
+  "bundleDependencies": [
+    "handlebars"
+  ]
 }
