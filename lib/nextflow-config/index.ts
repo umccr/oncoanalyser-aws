@@ -179,7 +179,7 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "ESVEE_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/hmftools-esvee:1.0--hdfd78af_0",
+      "ghcr.io/umccr/hmftools/hmftools-esvee:aarch64",
     );
     fixConfigSectionForTask(
       "SAMBAMBA_DOCKER_IMAGE_URI",
@@ -187,15 +187,15 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "SAMTOOLS_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/samtools:1.18--h50ea8bc_",
+      "quay.io/biocontainers/samtools:1.21--h96c455f_1",
     );
     fixConfigSectionForTask(
       "STAR_ALIGN_IMAGE_URI",
-      "quay.io/biocontainers/star:2.7.3a--0",
+      "quay.io/biocontainers/star:2.7.3a--h5ca1c30_1",
     );
     fixConfigSectionForTask(
       "GRIPSS_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/hmftools-gripss:2.4--hdfd78af_00",
+      "quay.io/biocontainers/hmftools-gripss:2.4--hdfd78af_0",
     );
     fixConfigSectionForTask(
       "COBALT_DOCKER_IMAGE_URI",
@@ -203,7 +203,7 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "LINX_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/hmftools-linx:2.0--hdfd78af_0",
+      "quay.io/biocontainers/hmftools-linx:2.0.2--hdfd78af_0",
     );
     fixConfigSectionForTask(
       "ISOFOX_DOCKER_IMAGE_URI",
@@ -219,7 +219,7 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "STAR_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/star:2.7.3a--0",
+      "quay.io/biocontainers/star:2.7.3a--h5ca1c30_1",
     );
     fixConfigSectionForTask(
       "PURPLE_DOCKER_IMAGE_URI",
@@ -251,7 +251,7 @@ export class NextflowConfigConstruct extends Construct {
     );
     fixConfigSectionForTask(
       "LILAC_SLICE_DOCKER_IMAGE_URI",
-      "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0",
+      "quay.io/biocontainers/samtools:1.21--h96c455f_1",
     );
     fixConfigSectionForTask(
       "BWAMEM2_DOCKER_IMAGE_URI",
